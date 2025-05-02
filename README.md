@@ -4,9 +4,9 @@ Un generatore automatico di struttura per progetti frontend e backend a partire 
 
 ## 📁 Struttura del progetto
 
-generate-code\/
+generate-code/
 │
-├── generators\/
+├── generators/
 │ ├── backend_generator.py
 │ ├── frontend_generator.py
 │ └── project_initializer.py
@@ -15,7 +15,6 @@ generate-code\/
 ├── project.json
 ├── main.py
 └── .gitignore
-
 ## 🚀 Come funziona
 
 Il progetto legge due file:
@@ -58,7 +57,7 @@ Assicurati di avere Python 3, Node.js, e npm installati.
 Posizionati nella root del progetto.
 
 Esegui:
->> python3 main.py
+> python3 main.py
 
 ⚙️ Dipendenze
 Python standard library (os, json)
