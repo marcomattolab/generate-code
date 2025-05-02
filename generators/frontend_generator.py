@@ -30,17 +30,23 @@ class FrontendGenerator:
         deps = [
             "primeng", "primeicons", "primeflex",
             "@angular/animations",
-            "@angular/forms"
+            "@angular/forms",
         ]
         run_cmd(f"npm install {' '.join(deps)}", cwd=path)
 
+
+
+
         dev_deps = [
         "@storybook/angular", "@storybook/cli",
-        "@angular-eslint/schematics"
+        "@angular-eslint/schematics",
+        "prettier"
         ]
         run_cmd(f"npm install --save-dev {' '.join(dev_deps)}", cwd=path)
 
         # run_cmd("npx -y sb init --builder webpack5", cwd=path)
+        # run_cmd("npx compodoc -p tsconfig.json", cwd=path)
+        # run_cmd("npm install json-server --save-dev", cwd=path)
 
 
     def _generate_components(self, path):
