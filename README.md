@@ -55,7 +55,7 @@ It then generates:
 }
 ```
 
-# ▶️ How to Run
+## ▶️ How to Run
 Make sure you have Python 3, Node.js, and npm installed.
 
 Navigate to the root of the project, then run:
@@ -63,5 +63,5 @@ Navigate to the root of the project, then run:
 > python3 main.py
 
 
-# 📄 License
+## 📄 License
 MIT License
