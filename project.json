@@ -1,7 +1,8 @@
 {
   "project": {
+    "app": "app",
+    "author": "marco martorana",
     "name":"generated_app",
-    "app": "app", 
     "backend": "backend",
     "frontend": "frontend"
   }

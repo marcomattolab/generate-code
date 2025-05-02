@@ -3,12 +3,13 @@ import json
 from utils import run_cmd
 
 class BackendGenerator:
-    def __init__(self, root_dir, entities_file):
+    def __init__(self, root_dir, entities_file, project_config):
         self.root_dir = root_dir
         self.entities_file = entities_file
+        self.project_config = project_config
 
     def generate(self):
-        backend_path = os.path.join(self.root_dir, "backend")
+        backend_path = os.path.join(self.root_dir, self.project_config["backend"])
         os.makedirs(backend_path, exist_ok=True)
         self._create_basic_structure(backend_path)
 

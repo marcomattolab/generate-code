@@ -5,6 +5,7 @@
       "columns": [
         { "name": "id", "type": "number" },
         { "name": "name", "type": "string" },
+        { "name": "username", "type": "string" },
         { "name": "email", "type": "string" }
       ]
     },
@@ -14,6 +15,14 @@
         { "name": "id", "type": "number" },
         { "name": "title", "type": "string" },
         { "name": "price", "type": "number" }
+      ]
+    },
+    {
+      "name": "Category",
+      "columns": [
+        { "name": "id", "type": "number" },
+        { "name": "name", "type": "string" },
+        { "name": "description", "type": "string" }
       ]
     }
   ]
