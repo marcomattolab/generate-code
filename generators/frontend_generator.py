@@ -70,35 +70,68 @@ class FrontendGenerator:
                 f.write(self._generate_component_html(entity))
             # Optional: routing + service + test generation here
 
-
     def _generate_component_code(self, entity):
-        return f"""
-import {{ Component, OnInit }} from '@angular/core';
+        class_name = entity["name"].capitalize()
+        form_controls = ",\n      ".join(
+            f'"{col["name"]}": fb.control("")' for col in entity["columns"]
+        )
+        return f"""import {{ Component, signal, computed, inject, effect }} from '@angular/core';
+        import {{ FormBuilder, FormGroup, ReactiveFormsModule }} from '@angular/forms';
+        import {{ CommonModule }} from '@angular/common';
+        import {{ InputTextModule }} from 'primeng/inputtext';
+        import {{ ButtonModule }} from 'primeng/button';
 
-@Component({{
-  selector: 'app-{entity["name"].lower()}',
-  templateUrl: './{entity["name"].lower()}.component.html'
-}})
-export class {entity["name"]}Component implements OnInit {{
-  constructor() {{ }}
-  ngOnInit(): void {{ }}
-}}
-"""
+        @Component({{
+            selector: 'app-{entity["name"].lower()}',
+            standalone: true,
+            imports: [CommonModule, ReactiveFormsModule, InputTextModule, ButtonModule],
+            templateUrl: './{entity["name"].lower()}.component.html'
+        }})
+        export class {class_name}Component {{
+
+        private fb = inject(FormBuilder);
+        form = this.fb.group({{
+            {form_controls}
+        }});
+
+        submit = signal(false);
+
+        save() {{
+            this.submit.set(true);
+            console.log("Saving", this.form.value);
+        }}
+        }}
+        """
+
 
     def _generate_component_html(self, entity):
-        inputs = "\n".join(
-            f"""<div class="field">
-  <label for="{col['name']}">{col['name'].capitalize()}</label>
-  <input id="{col['name']}" type="text" pInputText />
-</div>"""
-            for col in entity["columns"]
+        inputs = "\n    ".join(
+            f"""<div class="field mb-3">
+        <label for="{col['name']}" class="block text-sm font-medium text-gray-700">{col['name'].capitalize()}</label>
+        <input id="{col['name']}" type="text" pInputText formControlName="{col['name']}" class="w-full" />
+        </div>""" for col in entity["columns"]
         )
 
-        return f"""<div class="card">
-  <h2 class="text-xl mb-3">{entity["name"]} Form</h2>
-  <form>
-    {inputs}
-    <button pButton type="button" label="Save" class="mt-3"></button>
-  </form>
-</div>
+        return f"""<div class="card p-4 shadow-lg rounded bg-white">
+    <h2 class="text-2xl font-semibold mb-4">{entity["name"]} Form</h2>
+    <form [formGroup]="form" (ngSubmit)="save()">
+        {inputs}
+        <button pButton type="submit" label="Save" class="mt-4"></button>
+    </form>
+    </div>"""
+
+
+def generate_entities_routes(entities):
+    routes = ",\n  ".join(
+        f"""{{
+    path: '{entity["name"].lower()}',
+    loadComponent: () => import('./components/{entity["name"].lower()}/{entity["name"].lower()}.component').then(m => m.{entity["name"]}Component)
+  }}""" for entity in entities
+    )
+
+    return f"""import {{ Routes }} from '@angular/router';
+
+export const entityRoutes: Routes = [
+  {routes}
+];
 """
