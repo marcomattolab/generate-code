@@ -8,7 +8,12 @@ class ProjectInitializer:
 
     def create_base_structure(self):
         os.makedirs(self.root_dir, exist_ok=True)
+
         with open(self.project_file, "r") as f:
-            project = json.load(f)["project"]
-        os.makedirs(os.path.join(self.root_dir, project["frontend"]), exist_ok=True)
-        os.makedirs(os.path.join(self.root_dir, project["backend"]), exist_ok=True)
+            project_config = json.load(f)["project"]
+        
+        frontend_path = os.path.join(self.root_dir, project_config["frontend"])
+        backend_path = os.path.join(self.root_dir, project_config["backend"])
+        
+        os.makedirs(frontend_path, exist_ok=True)
+        os.makedirs(backend_path, exist_ok=True)
