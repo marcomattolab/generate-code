@@ -1,6 +1,7 @@
 {
   "project": {
-    "name":"generated_app", 
+    "name":"generated_app",
+    "app": "app", 
     "backend": "backend",
     "frontend": "frontend"
   }

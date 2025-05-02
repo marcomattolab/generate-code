@@ -1,0 +1,3 @@
+# ignore generated files
+/generated_app/
+/generated_app/frontend/

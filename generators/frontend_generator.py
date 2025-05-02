@@ -3,16 +3,22 @@ import json
 from utils import run_cmd
 
 class FrontendGenerator:
-    def __init__(self, root_dir, entities_file):
+    def __init__(self, root_dir, entities_file, project_config):
         self.root_dir = root_dir
         self.entities_file = entities_file
+        self.project_config = project_config
 
     def generate(self):
-        frontend_path = os.path.join(self.root_dir, "frontend")
+
+        frontend_path = os.path.join(self.root_dir, self.project_config["frontend"])
         os.makedirs(frontend_path, exist_ok=True)
-        # run_cmd("npx -y @angular/cli@latest new app --style=scss --routing=true --skip-git --skip-install", cwd=frontend_path)
+
+        app_path = os.path.join(frontend_path, "app")
+        os.makedirs(app_path, exist_ok=True)
+
+        run_cmd("npx -y @angular/cli@latest new app --style=scss --routing=true --skip-git --skip-install", cwd=frontend_path)
         self._install_dependencies(os.path.join(frontend_path, "app"))
-        self._generate_components(os.path.join(frontend_path, "app"))
+        # self._generate_components(os.path.join(frontend_path, "app"))
 
     def _install_dependencies(self, path):
         run_cmd("npm install primeng primeicons", cwd=path)
@@ -27,7 +33,7 @@ class FrontendGenerator:
             entities = json.load(f)["entities"]
         for entity in entities:
             component_dir = os.path.join(path, "src", "app", "components", entity["name"].lower())
-            os.makedirs(component_dir, exist_oks=True)
+            os.makedirs(component_dir, exist_ok=True)
             with open(os.path.join(component_dir, f"{entity['name'].lower()}.component.ts"), "w") as f:
                 f.write(self._generate_component_code(entity))
             with open(os.path.join(component_dir, f"{entity['name'].lower()}.component.html"), "w") as f:
