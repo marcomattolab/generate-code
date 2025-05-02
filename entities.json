@@ -1,0 +1,20 @@
+{
+  "entities": [
+    {
+      "name": "User",
+      "columns": [
+        { "name": "id", "type": "number" },
+        { "name": "name", "type": "string" },
+        { "name": "email", "type": "string" }
+      ]
+    },
+    {
+      "name": "Product",
+      "columns": [
+        { "name": "id", "type": "number" },
+        { "name": "title", "type": "string" },
+        { "name": "price", "type": "number" }
+      ]
+    }
+  ]
+}
