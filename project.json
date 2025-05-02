@@ -4,6 +4,7 @@
     "author": "marco martorana",
     "name":"generated_app",
     "backend": "backend",
-    "frontend": "frontend"
+    "frontend": "frontend",
+    "backend_package": "backend_package"
   }
 }

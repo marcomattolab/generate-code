@@ -40,7 +40,7 @@ class FrontendGenerator:
         ]
         run_cmd(f"npm install --save-dev {' '.join(dev_deps)}", cwd=path)
 
-        run_cmd("npx -y sb init --builder webpack5", cwd=path)
+        # run_cmd("npx -y sb init --builder webpack5", cwd=path)
 
 
     def _generate_components(self, path):
@@ -63,7 +63,6 @@ class FrontendGenerator:
             with open(os.path.join(entity_path, f"{name}.component.html"), "w") as f:
                 f.write(self._generate_component_html(entity))
             # Optional: routing + service + test generation here
-
 
 
     def _generate_component_code(self, entity):
