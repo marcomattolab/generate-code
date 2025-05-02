@@ -44,7 +44,7 @@ It then generates:
 }
 ```
 
-# Example of entities.json
+## 🧾 Example of entities.json
 
 ```json
 {
