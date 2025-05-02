@@ -5,12 +5,12 @@ Un generatore automatico di struttura per progetti frontend e backend a partire 
 ## 📁 Struttura del progetto
 
 generate-code/\
-│\
+│
 ├── generators/\
 │ ├── backend_generator.py\
 │ ├── frontend_generator.py\
 │ └── project_initializer.py\
-│\
+│
 ├── entities.json\
 ├── project.json\
 ├── main.py\
