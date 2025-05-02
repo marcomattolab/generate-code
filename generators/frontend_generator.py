@@ -30,7 +30,7 @@ class FrontendGenerator:
         deps = [
             "primeng", "primeicons", "primeflex",
             "@angular/animations",
-            "@angular/forms",
+            "@angular/forms"
         ]
         run_cmd(f"npm install {' '.join(deps)}", cwd=path)
 
