@@ -1,8 +1,9 @@
 # 🛠️ Code Generator
 
-Un generatore automatico di struttura per progetti frontend e backend a partire da una configurazione JSON.
+An automatic structure generator for frontend and backend projects based on a JSON configuration.
 
-## 📁 Struttura del progetto
+
+## 📁 Project structure
 
 generate-code/\
 │
@@ -17,20 +18,20 @@ generate-code/\
 └── .gitignore\
 
 
-## 🚀 Come funziona
+## 🚀 How It Works
 
-Il progetto legge due file:
+The project reads two files:
 
-- `project.json`: definisce la struttura base del progetto (nomi delle cartelle, nome app).
-- `entities.json`: contiene la lista delle entità da cui generare componenti Angular.
+- `project.json`: defines the basic project structure (folder names, app name).
+- `entities.json`: contains the list of entities to generate Angular components for.
 
-E genera:
+It then generates:
 
-- 📦 Struttura delle cartelle `frontend/`, `backend/`
-- 🧩 Componenti Angular per ogni entità
-- 📁 Boilerplate frontend (es. `npm install`, `primeng`, ecc.)
+- 📦 Folder structure for `frontend/` and `backend/`
+- 🧩 Angular components for each entity
+- 📁 Frontend boilerplate (e.g., `npm install`, `primeng`, etc.)
 
-## 🧾 Esempio di `project.json`
+## 🧾 Example `project.json`
 
 ```json
 {
@@ -43,7 +44,8 @@ E genera:
 }
 ```
 
-# Esempio di entities.json
+# Example of entities.json
+
 ```json
 {
   "entities": [
@@ -53,18 +55,13 @@ E genera:
 }
 ```
 
-# ▶️ Esecuzione
-Assicurati di avere Python 3, Node.js, e npm installati.
+# ▶️ How to Run
+Make sure you have Python 3, Node.js, and npm installed.
 
-Posizionati nella root del progetto.
+Navigate to the root of the project, then run:
 
-Esegui:
 > python3 main.py
 
-⚙️ Dipendenze
-Python standard library (os, json)
 
-Node.js & npm per il frontend
-
-📄 License
+# 📄 License
 MIT License
