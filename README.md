@@ -40,16 +40,17 @@ E genera:
     "frontend": "frontend"
   }
 }
+```
 
 # Esempio di entities.json
-
+```json
 {
   "entities": [
     { "name": "User" },
     { "name": "Product" }
   ]
 }
-
+```
 
 # ▶️ Esecuzione
 Assicurati di avere Python 3, Node.js, e npm installati.
