@@ -32,14 +32,14 @@ class FrontendGenerator:
     def _install_dependencies(self, path):
         deps = [
             "primeng", "primeicons", "primeflex",
-            "@angular/animations", 
+            "@angular/animations",
             "@angular/forms"
         ]
         run_cmd(f"npm install {' '.join(deps)}", cwd=path)
 
         dev_deps = [
             "@storybook/angular", "@storybook/cli",
-            "@angular-eslint/schematics", 
+            "@angular-eslint/schematics",
             "prettier"
         ]
         run_cmd(f"npm install --save-dev {' '.join(dev_deps)}", cwd=path)
@@ -53,7 +53,6 @@ class FrontendGenerator:
 
         for entity in entities:
             name = entity["name"].lower()
-            class_name = entity["name"].capitalize()
             entity_path = os.path.join(components_dir, name)
             os.makedirs(entity_path, exist_ok=True)
 
@@ -64,8 +63,8 @@ class FrontendGenerator:
             # .component.html
             with open(os.path.join(entity_path, f"{name}.component.html"), "w") as f:
                 f.write(self._generate_component_html(entity))
-            
-        # ✅ Generate entity-routes.ts
+
+        # Generate app.routes.ts
         routes_file_path = os.path.join(path, "src", "app", "app.routes.ts")
         with open(routes_file_path, "w") as f:
             f.write(self._generate_entities_routes(entities))
@@ -121,7 +120,6 @@ export class {class_name}Component {{
 </div>
 """
 
-
     def _generate_entities_routes(self, entities):
         routes = ",\n  ".join(
             f"""{{
@@ -131,6 +129,7 @@ export class {class_name}Component {{
         )
 
         return f"""import {{ Routes }} from '@angular/router';
+import {{ AppComponent }} from './app.component';
 
 export const routes: Routes = [
   {{
@@ -144,7 +143,7 @@ export const routes: Routes = [
     def _generate_app_component(self, path):
         with open(self.entities_file, "r") as f:
             entities = json.load(f)["entities"]
-        
+
         src_app_dir = os.path.join(path, "src", "app")
         os.makedirs(src_app_dir, exist_ok=True)
 
@@ -155,50 +154,50 @@ export const routes: Routes = [
         # TypeScript
         with open(os.path.join(src_app_dir, "app.component.ts"), "w") as f:
             f.write(f"""import {{ Component, signal, inject }} from '@angular/core';
-    import {{ RouterModule, Router }} from '@angular/router';
-    import {{ CommonModule }} from '@angular/common';
-    import {{ TableModule }} from 'primeng/table';
-    import {{ ButtonModule }} from 'primeng/button';
+import {{ RouterModule, Router }} from '@angular/router';
+import {{ CommonModule }} from '@angular/common';
+import {{ TableModule }} from 'primeng/table';
+import {{ ButtonModule }} from 'primeng/button';
 
-    @Component({{
-    selector: 'app-root',
-    standalone: true,
-    imports: [CommonModule, RouterModule, TableModule, ButtonModule],
-    templateUrl: './app.component.html'
-    }})
-    export class AppComponent {{
-    private router = inject(Router);
+@Component({{
+  selector: 'app-root',
+  standalone: true,
+  imports: [CommonModule, RouterModule, TableModule, ButtonModule],
+  templateUrl: './app.component.html'
+}})
+export class AppComponent {{
+  private router = inject(Router);
 
-    entities = signal([
-        {entity_array}
-    ]);
+  entities = signal([
+    {entity_array}
+  ]);
 
-    goTo(path: string, action: 'view' | 'edit') {{
-        this.router.navigate([path], {{ queryParams: {{ mode: action }} }});
-    }}
-    }}
-    """)
+  goTo(path: string, action: 'view' | 'edit') {{
+    this.router.navigate([path], {{ queryParams: {{ mode: action }} }});
+  }}
+}}
+""")
 
         # HTML
         with open(os.path.join(src_app_dir, "app.component.html"), "w") as f:
             f.write("""<div class="p-4">
-    <h1 class="text-2xl font-bold mb-4">Available Entities</h1>
-    <p-table [value]="entities()">
-        <ng-template pTemplate="header">
-        <tr>
-            <th>Name</th>
-            <th style="width: 200px;">Actions</th>
-        </tr>
-        </ng-template>
-        <ng-template pTemplate="body" let-entity>
-        <tr>
-            <td>{{ entity.name }}</td>
-            <td>
-            <button pButton label="View" class="p-button-sm mr-2" (click)="goTo(entity.name.toLowerCase(), 'view')"></button>
-            <button pButton label="Edit" class="p-button-sm p-button-secondary" (click)="goTo(entity.name.toLowerCase(), 'edit')"></button>
-            </td>
-        </tr>
-        </ng-template>
-    </p-table>
-    </div>
-    """)
+  <h1 class="text-2xl font-bold mb-4">Available Entities</h1>
+  <p-table [value]="entities()">
+    <ng-template pTemplate="header">
+      <tr>
+        <th>Name</th>
+        <th style="width: 200px;">Actions</th>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-entity>
+      <tr>
+        <td>{{ entity.name }}</td>
+        <td>
+          <button pButton label="View" class="p-button-sm mr-2" (click)="goTo(entity.name.toLowerCase(), 'view')"></button>
+          <button pButton label="Edit" class="p-button-sm p-button-secondary" (click)="goTo(entity.name.toLowerCase(), 'edit')"></button>
+        </td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+""")
