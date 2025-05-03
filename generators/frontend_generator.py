@@ -13,7 +13,10 @@ class FrontendGenerator:
         os.makedirs(frontend_dir, exist_ok=True)
 
         # 1. Generate Angular App
-        run_cmd("npx -y @angular/cli@latest new app --style=scss --routing=true --skip-git --skip-install ", cwd=frontend_dir)
+        run_cmd(
+            "npx -y @angular/cli@latest new app --style=scss --routing=true --skip-git --skip-install",
+            cwd=frontend_dir,
+        )
 
         app_path = os.path.join(frontend_dir, "app")
         if not os.path.exists(app_path):
@@ -25,29 +28,20 @@ class FrontendGenerator:
         # 3. Generate UI based on entities.json
         self._generate_components(app_path)
 
-
     def _install_dependencies(self, path):
         deps = [
             "primeng", "primeicons", "primeflex",
-            "@angular/animations",
+            "@angular/animations", 
             "@angular/forms"
         ]
         run_cmd(f"npm install {' '.join(deps)}", cwd=path)
 
-
-
-
         dev_deps = [
-        "@storybook/angular", "@storybook/cli",
-        "@angular-eslint/schematics",
-        "prettier"
+            "@storybook/angular", "@storybook/cli",
+            "@angular-eslint/schematics", 
+            "prettier"
         ]
         run_cmd(f"npm install --save-dev {' '.join(dev_deps)}", cwd=path)
-
-        # run_cmd("npx -y sb init --builder webpack5", cwd=path)
-        # run_cmd("npx compodoc -p tsconfig.json", cwd=path)
-        # run_cmd("npm install json-server --save-dev", cwd=path)
-
 
     def _generate_components(self, path):
         with open(self.entities_file, "r") as f:
@@ -65,68 +59,69 @@ class FrontendGenerator:
             # .component.ts
             with open(os.path.join(entity_path, f"{name}.component.ts"), "w") as f:
                 f.write(self._generate_component_code(entity))
+
             # .component.html
             with open(os.path.join(entity_path, f"{name}.component.html"), "w") as f:
                 f.write(self._generate_component_html(entity))
-            # Optional: routing + service + test generation here
 
     def _generate_component_code(self, entity):
         class_name = entity["name"].capitalize()
-        form_controls = ",\n      ".join(
-            f'"{col["name"]}": fb.control("")' for col in entity["columns"]
+        form_controls = ",\n    ".join(
+            f'"{col["name"]}": [""]' for col in entity["columns"]
         )
-        return f"""import {{ Component, signal, computed, inject, effect }} from '@angular/core';
-        import {{ FormBuilder, FormGroup, ReactiveFormsModule }} from '@angular/forms';
-        import {{ CommonModule }} from '@angular/common';
-        import {{ InputTextModule }} from 'primeng/inputtext';
-        import {{ ButtonModule }} from 'primeng/button';
 
-        @Component({{
-            selector: 'app-{entity["name"].lower()}',
-            standalone: true,
-            imports: [CommonModule, ReactiveFormsModule, InputTextModule, ButtonModule],
-            templateUrl: './{entity["name"].lower()}.component.html'
-        }})
-        export class {class_name}Component {{
+        return f"""import {{ Component, signal, inject }} from '@angular/core';
+import {{ FormBuilder, ReactiveFormsModule }} from '@angular/forms';
+import {{ CommonModule }} from '@angular/common';
+import {{ InputTextModule }} from 'primeng/inputtext';
+import {{ ButtonModule }} from 'primeng/button';
 
-        private fb = inject(FormBuilder);
-        form = this.fb.group({{
-            {form_controls}
-        }});
+@Component({{
+  selector: 'app-{entity["name"].lower()}',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule, InputTextModule, ButtonModule],
+  templateUrl: './{entity["name"].lower()}.component.html'
+}})
+export class {class_name}Component {{
 
-        submit = signal(false);
+  private fb = inject(FormBuilder);
+  form = this.fb.group({{
+    {form_controls}
+  }});
 
-        save() {{
-            this.submit.set(true);
-            console.log("Saving", this.form.value);
-        }}
-        }}
-        """
+  submit = signal(false);
 
+  save() {{
+    this.submit.set(true);
+    console.log("Saving", this.form.value);
+  }}
+}}
+"""
 
     def _generate_component_html(self, entity):
         inputs = "\n    ".join(
             f"""<div class="field mb-3">
-        <label for="{col['name']}" class="block text-sm font-medium text-gray-700">{col['name'].capitalize()}</label>
-        <input id="{col['name']}" type="text" pInputText formControlName="{col['name']}" class="w-full" />
-        </div>""" for col in entity["columns"]
+      <label for="{col['name']}" class="block text-sm font-medium text-gray-700">{col['name'].capitalize()}</label>
+      <input id="{col['name']}" type="text" pInputText formControlName="{col['name']}" class="w-full" />
+    </div>""" for col in entity["columns"]
         )
 
         return f"""<div class="card p-4 shadow-lg rounded bg-white">
-    <h2 class="text-2xl font-semibold mb-4">{entity["name"]} Form</h2>
-    <form [formGroup]="form" (ngSubmit)="save()">
-        {inputs}
-        <button pButton type="submit" label="Save" class="mt-4"></button>
-    </form>
-    </div>"""
+  <h2 class="text-2xl font-semibold mb-4">{entity["name"]} Form</h2>
+  <form [formGroup]="form" (ngSubmit)="save()">
+    {inputs}
+    <button pButton type="submit" label="Save" class="mt-4"></button>
+  </form>
+</div>
+"""
 
 
 def generate_entities_routes(entities):
     routes = ",\n  ".join(
         f"""{{
-    path: '{entity["name"].lower()}',
-    loadComponent: () => import('./components/{entity["name"].lower()}/{entity["name"].lower()}.component').then(m => m.{entity["name"]}Component)
-  }}""" for entity in entities
+  path: '{entity["name"].lower()}',
+  loadComponent: () => import('./components/{entity["name"].lower()}/{entity["name"].lower()}.component').then(m => m.{entity["name"]}Component)
+}}""" for entity in entities
     )
 
     return f"""import {{ Routes }} from '@angular/router';
