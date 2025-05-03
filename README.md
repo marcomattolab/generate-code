@@ -1,6 +1,10 @@
 # 🛠️ Code Generator
 
-An automatic structure generator for frontend and backend projects based on a JSON configuration.
+📁 An automatic structure generator for frontend and backend projects based on a JSON configuration.
+
+📌 Considerations: Creating an automatic code generator is a strategic choice to speed up software development, reduce repetitive errors, and ensure a consistent structure across projects. By automating the creation of components and structures, developers can focus more on business logic and less on initial setup.
+
+🧩 Author: Marco Martorana
 
 
 ## 📁 Project structure
