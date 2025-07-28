@@ -14,7 +14,7 @@ class FrontendGenerator:
 
         # 1. Generate Angular App
         run_cmd(
-            "npx -y @angular/cli@latest new app --style=scss --routing=true --skip-git --skip-install",
+            "npx -y @angular/cli@latest new app --style=scss --routing=false --skip-git --skip-install",
             cwd=frontend_dir,
         )
 
