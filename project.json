@@ -5,6 +5,7 @@
     "name":"generated_app",
     "backend": "backend",
     "frontend": "frontend",
-    "backend_package": "backend_package"
+    "backend_package": "backend_package",
+    "mobile_app": "my_flutter_app"
   }
 }
