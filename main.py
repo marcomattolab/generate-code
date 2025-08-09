@@ -1,6 +1,7 @@
 from generators.frontend_generator import FrontendGenerator
 from generators.backend_generator import BackendGenerator
 from generators.project_initializer import ProjectInitializer
+from generators.cicd_generator import CiCdGenerator
 import json
 
 class CodeGenerator:
@@ -13,6 +14,7 @@ class CodeGenerator:
         self.initializer = ProjectInitializer(self.root_dir ,project_file)
         self.frontend = FrontendGenerator(self.root_dir, entities_file, self.project_config)
         self.backend = BackendGenerator(self.root_dir, entities_file, self.project_config)
+        self.cicd = CiCdGenerator(self.root_dir, self.project_config)
 
     def _load_project_config(self):
         with open(self.project_file, "r") as file:
@@ -20,8 +22,9 @@ class CodeGenerator:
         
     def generate(self):
         self.initializer.create_base_structure()
-        self.frontend.generate()
-        self.backend.generate()
+        # self.frontend.generate() # Temporarily disabled for verification
+        # self.backend.generate() # Temporarily disabled for verification
+        self.cicd.generate()
 
 if __name__ == "__main__":
     generator = CodeGenerator()
