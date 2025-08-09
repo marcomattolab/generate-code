@@ -1,71 +1,102 @@
-# 🛠️ Code Generator
+# 🚀 Full-Stack App Generator 🚀
 
-📁 An automatic structure generator for frontend and backend projects based on a JSON configuration.
+This project is a powerful code generator that scaffolds a complete full-stack application, including a web frontend, a backend, a mobile app, and a full CI/CD pipeline with Docker. It's designed to accelerate development by automating the creation of boilerplate code and project structure based on a simple JSON configuration.
 
-📌 Considerations: Creating an automatic code generator is a strategic choice to speed up software development, reduce repetitive errors, and ensure a consistent structure across projects. By automating the creation of components and structures, developers can focus more on business logic and less on initial setup.
+## ✨ Features
 
-🧩 Author: Marco Martorana
+The generator creates a multi-platform application with a rich set of features out of the box.
 
+### 🌐 Frontend (Angular)
 
-## 📁 Project structure
+- **Modern Angular Setup:** Standalone components, SCSS styling.
+- **Component Library:** PrimeNG for a rich set of UI components.
+- **Styling:** Tailwind CSS for utility-first styling.
+- **State Management:** NGXS for robust and scalable state management.
+- **API Integration:** Generates services for all entities to communicate with the backend.
+- **Development Proxy:** Configures a proxy to the backend to avoid CORS issues.
+- **Internationalization (i18n):** Uses `@ngx-translate` for multi-language support.
+- **Testing:**
+    - **Cypress:** For end-to-end testing.
+    - **Storybook:** For component visualization and testing.
+    - **Component Tests:** Generates basic `.spec.ts` files for all components.
+- **Documentation:** Configured with Compodoc for generating project documentation.
 
-generate-code/\
-│
-├── generators/\
-│ ├── backend_generator.py\
-│ ├── frontend_generator.py\
-│ └── project_initializer.py\
-│
-├── entities.json\
-├── project.json\
-├── main.py\
-└── .gitignore\
+### ⚙️ Backend (Spring Boot)
 
+- **Build System:** Maven for dependency management.
+- **Database:** PostgreSQL for robust data persistence.
+- **API:** Generates a complete RESTful API for all entities.
+- **Architecture:**
+    - **DTO Pattern:** Decouples the API from the database entities.
+    - **Service Layer:** For business logic.
+- **ORM:** Spring Data JPA for data access.
+- **Code Quality:** Uses Lombok to reduce boilerplate code.
+- **Monitoring:** Exposes metrics for Prometheus via Spring Boot Actuator.
+
+### 📱 Mobile (Flutter)
+
+- **Cross-Platform:** Generates a Flutter application for both Android and iOS.
+- **State Management:** Uses the Provider pattern for simple and effective state management.
+- **API Integration:** Generates services to communicate with the backend API.
+- **UI:** Creates basic list screens for all entities.
+
+### 🐳 CI/CD (Docker)
+
+- **Containerization:** Generates multi-stage `Dockerfile`s for the frontend and backend to produce lean, production-ready images.
+- **Orchestration:** Creates a `docker-compose.yml` file to manage the entire application stack.
+- **Services:**
+    - **Nginx:** Acts as a reverse proxy for the frontend and backend.
+    - **PostgreSQL:** The application database.
+    - **MinIO:** S3-compatible object storage.
+    - **Prometheus:** For collecting application metrics.
+    - **Grafana:** For visualizing metrics, pre-configured with Prometheus as a data source.
 
 ## 🚀 How It Works
 
-The project reads two files:
+The project reads two main configuration files:
 
-- `project.json`: defines the basic project structure (folder names, app name).
-- `entities.json`: contains the list of entities to generate Angular components for.
+- `project.json`: Defines the basic project structure (e.g., app names, package names).
+- `entities.json`: Contains the list of entities and their properties, which drives the code generation for all platforms.
 
-It then generates:
-
-- 📦 Folder structure for `frontend/` and `backend/`
-- 🧩 Angular components for each entity
-- 📁 Frontend boilerplate (e.g., `npm install`, `primeng`, etc.)
-
-## 🧾 Example `project.json`
-
-```json
-{
-  "project": {
-    "name": "generated_app",
-    "app": "app",
-    "backend": "backend",
-    "frontend": "frontend"
-  }
-}
-```
-
-## 🧾 Example of entities.json
-
-```json
-{
-  "entities": [
-    { "name": "User" },
-    { "name": "Product" }
-  ]
-}
-```
+The `main.py` script orchestrates the following generators:
+- `ProjectInitializer`: Creates the basic directory structure.
+- `FrontendGenerator`: Scaffolds the Angular web application.
+- `BackendGenerator`: Scaffolds the Spring Boot backend application.
+- `MobileGenerator`: Scaffolds the Flutter mobile application.
+- `CiCdGenerator`: Creates the Dockerfiles and `docker-compose.yml`.
 
 ## ▶️ How to Run
-Make sure you have Python 3, Node.js, and npm installed.
 
-Navigate to the root of the project, then run:
+### Prerequisites
 
-> python3 main.py
+- Python 3
+- Docker and Docker Compose
+- Flutter SDK (if you want to run the mobile app locally)
+- Node.js and npm (for local frontend development)
+- Java and Maven (for local backend development)
 
+### Generating the Application
+
+1.  Customize `project.json` and `entities.json` to define your application.
+2.  Run the generator:
+    ```bash
+    python3 main.py
+    ```
+    This will create a new directory (specified by the `name` in `project.json`, e.g., `generated_app/`) containing the complete project.
+
+### Running the Full Stack with Docker
+
+Navigate to the generated project directory and run:
+```bash
+docker-compose up --build
+```
+This will build the Docker images and start all the services. The application will be available at `http://localhost`.
+
+- **Web Frontend:** `http://localhost`
+- **Backend API:** `http://localhost/api`
+- **MinIO Console:** `http://localhost:9001`
+- **Prometheus:** `http://localhost:9090`
+- **Grafana:** `http://localhost:3000`
 
 ## 📄 License
 MIT License
