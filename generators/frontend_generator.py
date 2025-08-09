@@ -47,10 +47,19 @@ class FrontendGenerator:
 
         # 7. Configure Angular proxy
         self._create_proxy_config(app_path)
-        self._update_angular_json_for_proxy(app_path)
+        self._update_angular_json(app_path)
 
         # 8. Generate i18n files
         self._generate_translation_files(app_path)
+
+        # 9. Generate Tailwind config
+        self._generate_tailwind_config(app_path)
+
+        # 10. Add Compodoc script
+        self._add_compodoc_script(app_path)
+
+        # 11. Generate environment files
+        self._generate_environment_files(app_path)
 
     def _install_dependencies(self, path):
         deps = [
@@ -69,7 +78,9 @@ class FrontendGenerator:
             "prettier",
             "cypress",
             "@ngxs/logger-plugin",
-            "@ngxs/devtools-plugin"
+            "@ngxs/devtools-plugin",
+            "tailwindcss",
+            "@compodoc/compodoc"
         ]
         run_cmd(f"npm install --save-dev {' '.join(dev_deps)}", cwd=path)
 
@@ -356,13 +367,14 @@ import {{ Injectable, inject }} from '@angular/core';
 import {{ HttpClient }} from '@angular/common/http';
 import {{ Observable }} from 'rxjs';
 import {{ {dto_name} }} from '../models/{entity_name.lower()}.dto';
+import {{ environment }} from '../../../../environments/environment';
 
 @Injectable({{
   providedIn: 'root'
 }})
 export class {entity_name_cap}Service {{
   private http = inject(HttpClient);
-  private apiUrl = '/api/{entity_name.lower()}s';
+  private apiUrl = `${{environment.apiUrl}}/{entity_name.lower()}s`;
 
   getAll(): Observable<{dto_name}[]> {{
     return this.http.get<{dto_name}[]>(this.apiUrl);
@@ -703,15 +715,24 @@ export function HttpLoaderFactory(httpClient: HttpClient) {{
     def _update_styles(self, app_path):
         styles_path = os.path.join(app_path, "src", "styles.scss")
 
-        styles_to_add = """
+        tailwind_directives = """
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+"""
+
+        primeng_styles = """
 @import "primeng/resources/themes/lara-light-blue/theme.css";
 @import "primeng/resources/primeng.css";
 @import "primeicons/primeicons.css";
 @import "primeflex/primeflex.css";
 """
 
-        with open(styles_path, "a") as f:
-            f.write(styles_to_add)
+        final_styles = tailwind_directives + primeng_styles
+
+        with open(styles_path, "w") as f:
+            f.write(final_styles)
 
     def _setup_storybook(self, app_path):
         """Initializes Storybook in the generated project."""
@@ -757,6 +778,31 @@ export default defineConfig({
             json.dump(package_json, f, indent=2)
             f.truncate()
 
+    def _generate_environment_files(self, app_path):
+        """Generates environment files for the Angular application."""
+        env_path = os.path.join(app_path, "src", "environments")
+        os.makedirs(env_path, exist_ok=True)
+
+        # environment.ts
+        env_content = """
+export const environment = {
+  production: false,
+  apiUrl: '/api'
+};
+"""
+        with open(os.path.join(env_path, "environment.ts"), "w") as f:
+            f.write(env_content)
+
+        # environment.prod.ts
+        prod_env_content = """
+export const environment = {
+  production: true,
+  apiUrl: 'https://your-production-api.com/api'
+};
+"""
+        with open(os.path.join(env_path, "environment.prod.ts"), "w") as f:
+            f.write(prod_env_content)
+
     def _create_proxy_config(self, app_path):
         """Creates a proxy configuration file for the Angular dev server."""
         proxy_config_path = os.path.join(app_path, "proxy.conf.json")
@@ -772,8 +818,8 @@ export default defineConfig({
         with open(proxy_config_path, "w") as f:
             json.dump(proxy_config_content, f, indent=2)
 
-    def _update_angular_json_for_proxy(self, app_path):
-        """Updates angular.json to use the proxy configuration."""
+    def _update_angular_json(self, app_path):
+        """Updates angular.json for proxy and environments."""
         angular_json_path = os.path.join(app_path, "angular.json")
 
         with open(angular_json_path, "r+") as f:
@@ -782,8 +828,19 @@ export default defineConfig({
             project_name = self.project_config["app"]
 
             if "projects" in angular_json and project_name in angular_json["projects"]:
+                # Proxy config
                 serve_options = angular_json["projects"][project_name]["architect"]["serve"]["options"]
                 serve_options["proxyConfig"] = "proxy.conf.json"
+
+                # File replacements for production build
+                build_prod_config = angular_json["projects"][project_name]["architect"]["build"]["configurations"]["production"]
+                if "fileReplacements" not in build_prod_config:
+                    build_prod_config["fileReplacements"] = []
+
+                build_prod_config["fileReplacements"].append({
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.prod.ts"
+                })
 
             f.seek(0)
             json.dump(angular_json, f, indent=2)
@@ -811,3 +868,35 @@ export default defineConfig({
 
         with open(en_json_path, "w") as f:
             json.dump(translations, f, indent=2)
+
+    def _generate_tailwind_config(self, app_path):
+        """Creates a tailwind.config.js file."""
+        config_path = os.path.join(app_path, "tailwind.config.js")
+
+        config_content = """
+module.exports = {
+  content: [
+    "./src/**/*.{html,ts}",
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+};
+"""
+
+        with open(config_path, "w") as f:
+            f.write(config_content)
+
+    def _add_compodoc_script(self, app_path):
+        """Adds a script to package.json to run Compodoc."""
+        package_json_path = os.path.join(app_path, "package.json")
+
+        with open(package_json_path, "r+") as f:
+            package_json = json.load(f)
+            if "scripts" not in package_json:
+                package_json["scripts"] = {}
+            package_json["scripts"]["compodoc"] = "npx compodoc -p src/tsconfig.app.json -s"
+            f.seek(0)
+            json.dump(package_json, f, indent=2)
+            f.truncate()
