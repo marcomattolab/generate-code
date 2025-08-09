@@ -6,6 +6,10 @@
     "backend": "backend",
     "frontend": "frontend",
     "backend_package": "backend_package",
-    "mobile_app": "my_flutter_app"
+    "mobile_app": "my_flutter_app",
+    "features": {
+      "authentication": true,
+      "monitoring": true
+    }
   }
 }

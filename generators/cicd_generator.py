@@ -12,8 +12,14 @@ class CiCdGenerator:
         self._generate_backend_dockerfile()
         self._generate_frontend_dockerfile()
         self._generate_nginx_config()
-        self._generate_prometheus_config()
-        self._generate_grafana_config()
+
+        if self.project_config.get("features", {}).get("monitoring"):
+            self._generate_prometheus_config()
+            self._generate_grafana_config()
+
+        if self.project_config.get("features", {}).get("authentication"):
+            self._generate_keycloak_realm_config()
+
         self._generate_docker_compose()
         self._log("CI/CD generation complete.")
 
@@ -108,107 +114,104 @@ scrape_configs:
         """Generates a docker-compose.yml file for the entire application stack."""
         compose_path = os.path.join(self.root_dir, "docker-compose.yml")
 
-        compose_content = """
-version: '3.8'
+        import yaml
 
-services:
-  database:
-    image: postgres:15-alpine
-    container_name: my_database
-    environment:
-      POSTGRES_DB: mydatabase
-      POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: mypassword
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+        compose_data = {
+            "version": "3.8",
+            "services": {
+                "database": {
+                    "image": "postgres:15-alpine",
+                    "container_name": "my_database",
+                    "environment": {
+                        "POSTGRES_DB": "mydatabase",
+                        "POSTGRES_USER": "myuser",
+                        "POSTGRES_PASSWORD": "mypassword"
+                    },
+                    "volumes": ["postgres_data:/var/lib/postgresql/data"],
+                    "ports": ["5432:5432"]
+                },
+                "minio": {
+                    "image": "minio/minio:RELEASE.2023-09-07T22-05-05Z",
+                    "container_name": "my_minio",
+                    "environment": {
+                        "MINIO_ROOT_USER": "minioadmin",
+                        "MINIO_ROOT_PASSWORD": "minioadmin"
+                    },
+                    "volumes": ["minio_data:/data"],
+                    "ports": ["9000:9000", "9001:9001"],
+                    "command": "server /data --console-address \":9001\""
+                },
+                "backend": {
+                    "build": {"context": "./backend"},
+                    "container_name": "my_backend",
+                    "depends_on": ["database", "minio"],
+                    "environment": {
+                        "SPRING_DATASOURCE_URL": "jdbc:postgresql://database:5432/mydatabase",
+                        "SPRING_DATASOURCE_USERNAME": "myuser",
+                        "SPRING_DATASOURCE_PASSWORD": "mypassword",
+                        "MINIO_URL": "http://minio:9000",
+                        "MINIO_ACCESS_KEY": "minioadmin",
+                        "MINIO_SECRET_KEY": "minioadmin"
+                    },
+                    "ports": ["8080:8080"]
+                },
+                "nginx": {
+                    "build": {"context": "./frontend/app"},
+                    "container_name": "my_nginx",
+                    "depends_on": ["backend"],
+                    "ports": ["80:80"]
+                }
+            },
+            "volumes": {
+                "postgres_data": None,
+                "minio_data": None
+            }
+        }
 
-  minio:
-    image: minio/minio:RELEASE.2023-09-07T22-05-05Z
-    container_name: my_minio
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    volumes:
-      - minio_data:/data
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    command: server /data --console-address ":9001"
+        if self.project_config.get("features", {}).get("authentication"):
+            compose_data["services"]["keycloak"] = {
+                "image": "quay.io/keycloak/keycloak:22.0.1",
+                "container_name": "my_keycloak",
+                "environment": {
+                    "KEYCLOAK_ADMIN": "admin",
+                    "KEYCLOAK_ADMIN_PASSWORD": "admin"
+                },
+                "command": ["start-dev", "--import-realm"],
+                "volumes": ["./keycloak:/opt/keycloak/data/import"],
+                "ports": ["8081:8080"]
+            }
+            compose_data["services"]["backend"]["depends_on"].append("keycloak")
+            compose_data["services"]["backend"]["environment"]["SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI"] = "http://keycloak:8080/realms/myrealm"
 
-  keycloak:
-    image: quay.io/keycloak/keycloak:22.0.1
-    container_name: my_keycloak
-    environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-    command: ["start-dev", "--import-realm"]
-    volumes:
-      - ./keycloak:/opt/keycloak/data/import
-    ports:
-      - "8081:8080"
-
-  prometheus:
-    image: prom/prometheus:v2.47.0
-    container_name: my_prometheus
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    ports:
-      - "9090:9090"
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-
-  grafana:
-    image: grafana/grafana:10.1.1
-    container_name: my_grafana
-    depends_on:
-      - prometheus
-    volumes:
-      - ./grafana/provisioning/:/etc/grafana/provisioning/
-      - grafana_data:/var/lib/grafana
-    ports:
-      - "3000:3000"
-
-  backend:
-    build:
-      context: ./backend
-    container_name: my_backend
-    depends_on:
-      - database
-      - minio
-      - keycloak
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://database:5432/mydatabase
-      SPRING_DATASOURCE_USERNAME: myuser
-      SPRING_DATASOURCE_PASSWORD: mypassword
-      MINIO_URL: http://minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/myrealm
-    ports:
-      - "8080:8080"
-
-  nginx:
-    build:
-      context: ./frontend/app
-    container_name: my_nginx
-    depends_on:
-      - backend
-    ports:
-      - "80:80"
-
-volumes:
-  postgres_data:
-  minio_data:
-  prometheus_data:
-  grafana_data:
-"""
+        if self.project_config.get("features", {}).get("monitoring"):
+            compose_data["services"]["prometheus"] = {
+                "image": "prom/prometheus:v2.47.0",
+                "container_name": "my_prometheus",
+                "volumes": [
+                    "./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml",
+                    "prometheus_data:/prometheus"
+                ],
+                "ports": ["9090:9090"],
+                "command": [
+                    '--config.file=/etc/prometheus/prometheus.yml',
+                    '--storage.tsdb.path=/prometheus'
+                ]
+            }
+            compose_data["services"]["grafana"] = {
+                "image": "grafana/grafana:10.1.1",
+                "container_name": "my_grafana",
+                "depends_on": ["prometheus"],
+                "volumes": [
+                    "./grafana/provisioning/:/etc/grafana/provisioning/",
+                    "grafana_data:/var/lib/grafana"
+                ],
+                "ports": ["3000:3000"]
+            }
+            compose_data["volumes"]["prometheus_data"] = None
+            compose_data["volumes"]["grafana_data"] = None
 
         with open(compose_path, "w") as f:
-            f.write(compose_content)
+            yaml.dump(compose_data, f, default_flow_style=False, sort_keys=False)
 
     def _generate_nginx_config(self):
         """Generates a custom Nginx configuration file."""

@@ -22,7 +22,17 @@ class BackendGenerator:
     def _create_basic_structure(self, path):
         """Downloads and unzips the base Spring Boot project."""
         self._log("Creating Spring Boot base structure...")
-        run_cmd("curl 'https://start.spring.io/starter.zip?type=maven-project&dependencies=web,data-jpa,postgresql,lombok,actuator,prometheus,oauth2-resource-server' -o app.zip", cwd=path)
+
+        dependencies = ["web", "data-jpa", "postgresql", "lombok"]
+        if self.project_config.get("features", {}).get("authentication"):
+            dependencies.append("oauth2-resource-server")
+        if self.project_config.get("features", {}).get("monitoring"):
+            dependencies.append("actuator")
+            dependencies.append("prometheus")
+
+        deps_str = ",".join(dependencies)
+
+        run_cmd(f"curl 'https://start.spring.io/starter.zip?type=maven-project&dependencies={deps_str}' -o app.zip", cwd=path)
         run_cmd("unzip app.zip -d .", cwd=path)
         os.remove(os.path.join(path, "app.zip"))
 
@@ -36,11 +46,14 @@ spring.datasource.password=mypassword
 spring.jpa.hibernate.ddl-auto=update
 spring.jpa.show-sql=true
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
-management.endpoints.web.exposure.include=prometheus
-
-# Keycloak
-spring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost:8081/realms/myrealm
 """
+
+        if self.project_config.get("features", {}).get("monitoring"):
+            properties_content += "management.endpoints.web.exposure.include=prometheus\n"
+
+        if self.project_config.get("features", {}).get("authentication"):
+            properties_content += "\n# Keycloak\n"
+            properties_content += "spring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost:8081/realms/myrealm\n"
 
         with open(properties_path, "w") as f:
             f.write(properties_content)
@@ -71,7 +84,8 @@ spring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost:8081/realm
             # Creazione Controller
             self._generate_controller(entity, src_path, entity_name, entity_name_lower)
 
-        self._generate_security_config(src_path)
+        if self.project_config.get("features", {}).get("authentication"):
+            self._generate_security_config(src_path)
 
     def _generate_entity(self, entity, src_path, entity_name, entity_name_lower):
         """Generates a JPA Entity class for the given entity."""
@@ -84,6 +98,19 @@ spring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost:8081/realm
                 continue
             java_type = self._map_type(col['type'])
             entity_fields.append(f"    private {java_type} {col['name']};")
+
+        if "relationships" in entity:
+            for rel in entity["relationships"]:
+                if rel["type"] == "manyToOne":
+                    rel_entity = rel["entity"]
+                    rel_name = rel["name"]
+                    entity_fields.append(f"\n    @ManyToOne\n    @JoinColumn(name = \"{rel_name}_id\")\n    private {rel_entity} {rel_name};")
+                elif rel["type"] == "oneToMany":
+                    rel_entity = rel["entity"]
+                    rel_name = rel["name"]
+                    mapped_by = rel["mappedBy"]
+                    entity_fields.append(f"\n    @OneToMany(mappedBy = \"{mapped_by}\")\n    private java.util.List<{rel_entity}> {rel_name};")
+
 
         entity_fields_str = "\n".join(entity_fields)
 
@@ -260,22 +287,36 @@ public class {entity_name}Service {{
         package_name = self.project_config["backend_package"]
         dto_name = f"{entity_name}Dto"
 
+        authentication_enabled = self.project_config.get("features", {}).get("authentication")
+
+        imports = [
+            f"import {package_name}.dto.{dto_name};",
+            f"import {package_name}.service.{entity_name}Service;",
+            "import org.springframework.beans.factory.annotation.Autowired;",
+            "import org.springframework.http.ResponseEntity;",
+            "import org.springframework.web.bind.annotation.*;",
+            "import java.util.List;"
+        ]
+
+        annotations = [
+            "@RestController",
+            f'@RequestMapping("/api/{entity_name_lower}s")'
+        ]
+
+        if authentication_enabled:
+            imports.append("import org.springframework.security.access.prepost.PreAuthorize;")
+            annotations.append("@PreAuthorize(\"hasRole('user')\")")
+
+        imports_str = "\n".join(imports)
+        annotations_str = "\n".join(annotations)
+
         with open(os.path.join(controller_path, f"{entity_name}Controller.java"), "w") as f:
             f.write(f'''
 package {package_name}.controller;
 
-import {package_name}.dto.{dto_name};
-import {package_name}.service.{entity_name}Service;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+{imports_str}
 
-import java.util.List;
-
-@RestController
-@RequestMapping("/api/{entity_name_lower}s")
-@PreAuthorize("hasRole('user')")
+{annotations_str}
 public class {entity_name}Controller {{
     @Autowired
     private {entity_name}Service service;

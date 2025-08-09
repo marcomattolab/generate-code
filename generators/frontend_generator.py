@@ -62,8 +62,10 @@ class FrontendGenerator:
         self._generate_environment_files(app_path)
 
         # 12. Generate auth files
-        self._generate_auth_files(app_path)
-        self._generate_auth_interceptor(app_path)
+        if self.project_config.get("features", {}).get("authentication"):
+            self._generate_auth_files(app_path)
+            self._generate_auth_interceptor(app_path)
+            self._generate_auth_guard(app_path)
 
     def _install_dependencies(self, path):
         deps = [
@@ -71,9 +73,11 @@ class FrontendGenerator:
             "@angular/animations",
             "@angular/forms",
             "@ngx-translate/core",
-            "@ngx-translate/http-loader",
-            "angular-oauth2-oidc"
+            "@ngx-translate/http-loader"
         ]
+        if self.project_config.get("features", {}).get("authentication"):
+            deps.append("angular-oauth2-oidc")
+
         run_cmd(f"npm install {' '.join(deps)}", cwd=path)
 
         dev_deps = [
@@ -418,14 +422,27 @@ export class {entity_name_cap}Service {{
 
         first_entity_path = entities[0]["name"].lower()
 
-        routes = ",\n  ".join(
-            f"""{{
-      path: '{entity["name"].lower()}',
-      loadComponent: () => import('./components/{entity["name"].lower()}/{entity["name"].lower()}.component').then(m => m.{entity["name"].capitalize()}Component)
-    }}""" for entity in entities
-        )
+        authentication_enabled = self.project_config.get("features", {}).get("authentication")
 
-        return f"""import {{ Routes }} from '@angular/router';
+        imports = ["import { Routes } from '@angular/router';"]
+        if authentication_enabled:
+            imports.append("import { authGuard } from './core/guards/auth.guard';")
+
+        imports_str = "\n".join(imports)
+
+        routes = []
+        can_activate_str = ", canActivate: [authGuard]" if authentication_enabled else ""
+
+        for entity in entities:
+            route = f\"\"\"{{
+      path: '{entity["name"].lower()}',
+      loadComponent: () => import('./components/{entity["name"].lower()}/{entity["name"].lower()}.component').then(m => m.{entity["name"].capitalize()}Component){can_activate_str}
+    }}\"\"\"
+            routes.append(route)
+
+        routes_str = ",\n  ".join(routes)
+
+        return f\"\"\"{imports_str}
 
 export const routes: Routes = [
   {{
@@ -433,9 +450,9 @@ export const routes: Routes = [
     redirectTo: '{first_entity_path}',
     pathMatch: 'full'
   }},
-  {routes}
+  {routes_str}
 ];
-"""
+\"\"\"
 
     def _generate_app_component(self, path):
         with open(self.entities_file, "r") as f:
@@ -444,13 +461,36 @@ export const routes: Routes = [
         src_app_dir = os.path.join(path, "src", "app")
         os.makedirs(src_app_dir, exist_ok=True)
 
+        authentication_enabled = self.project_config.get("features", {}).get("authentication")
+
         # app.component.ts
         entity_list = ",\n    ".join([f"{{ name: '{e['name'].capitalize()}', path: '/{e['name'].lower()}' }}" for e in entities])
-        ts_code = f'''import {{ Component, inject }} from '@angular/core';
-import {{ RouterModule }} from '@angular/router';
-import {{ CommonModule }} from '@angular/common';
-import {{ TranslateService, TranslateModule }} from '@ngx-translate/core';
-import {{ AuthService }} from './core/auth/auth.service';
+
+        ts_imports = [
+            "import {{ Component, inject }} from '@angular/core';",
+            "import {{ RouterModule }} from '@angular/router';",
+            "import {{ CommonModule }} from '@angular/common';",
+            "import {{ TranslateService, TranslateModule }} from '@ngx-translate/core';"
+        ]
+
+        ts_class_members = [
+            f"  entities = [\n    {entity_list}\n  ];",
+            "  private translate = inject(TranslateService);"
+        ]
+
+        constructor_body = """
+    this.translate.setDefaultLang('en');
+    this.translate.use('en');
+"""
+
+        if authentication_enabled:
+            ts_imports.append("import {{ AuthService }} from './core/auth/auth.service';")
+            ts_class_members.insert(0, "  authService = inject(AuthService);")
+
+        ts_imports_str = "\n".join(ts_imports)
+        ts_class_members_str = "\n\n".join(ts_class_members)
+
+        ts_code = f'''{ts_imports_str}
 
 @Component({{
   selector: 'app-root',
@@ -460,16 +500,9 @@ import {{ AuthService }} from './core/auth/auth.service';
   styleUrls: ['./app.component.scss']
 }})
 export class AppComponent {{
-  authService = inject(AuthService);
-  entities = [
-    {entity_list}
-  ];
+{ts_class_members_str}
 
-  private translate = inject(TranslateService);
-
-  constructor() {{
-    this.translate.setDefaultLang('en');
-    this.translate.use('en');
+  constructor() {{{constructor_body}
   }}
 }}
 '''
@@ -477,6 +510,23 @@ export class AppComponent {{
             f.write(ts_code)
 
         # app.component.html
+        auth_buttons_html = ""
+        if authentication_enabled:
+            auth_buttons_html = """
+    <div class="mt-auto">
+      @if (authService.isLoggedIn) {
+        <div class="p-2 text-center">
+          <span>{{ authService.username }}</span>
+          <button (click)="authService.logout()" class="w-full mt-2 p-2 bg-red-600 rounded">Logout</button>
+        </div>
+      } @else {
+        <div class="p-2 text-center">
+          <button (click)="authService.login()" class="w-full p-2 bg-green-600 rounded">Login</button>
+        </div>
+      }
+    </div>
+"""
+
         html_code = f'''<div class="flex h-screen bg-gray-100 font-sans">
   <!-- Sidebar -->
   <div class="w-64 bg-gray-800 text-white p-5 flex flex-col shadow-lg">
@@ -496,18 +546,7 @@ export class AppComponent {{
         </ul>
       </nav>
     </div>
-    <div class="mt-auto">
-      @if (authService.isLoggedIn) {{
-        <div class="p-2 text-center">
-          <span>{{{{ authService.username }}}}</span>
-          <button (click)="authService.logout()" class="w-full mt-2 p-2 bg-red-600 rounded">Logout</button>
-        </div>
-      }} @else {{
-        <div class="p-2 text-center">
-          <button (click)="authService.login()" class="w-full p-2 bg-green-600 rounded">Login</button>
-        </div>
-      }}
-    </div>
+    {auth_buttons_html}
   </div>
 
   <!-- Main Content -->
@@ -546,33 +585,42 @@ import {{ importProvidersFrom }} from '@angular/core';
 import {{ TranslateModule, TranslateLoader }} from '@ngx-translate/core';
 import {{ TranslateHttpLoader }} from '@ngx-translate/http-loader';
 import {{ environment }} from '../environments/environment';
+\"\"\"
+
+        if self.project_config.get("features", {}).get("authentication"):
+            imports_to_add += """
 import {{ OAuthService }} from 'angular-oauth2-oidc';
 import {{ AuthInterceptor }} from './core/interceptors/auth.interceptor';
 import {{ HTTP_INTERCEPTORS }} from '@angular/common/http';
+"""
 
-export function HttpLoaderFactory(httpClient: HttpClient) {{
+        imports_to_add += """
+export function HttpLoaderFactory(httpClient: HttpClient) {
   return new TranslateHttpLoader(httpClient);
-}}
-\"\"\"
+}
+"""
 
         # Prepend the imports to be safe
         content = imports_to_add + content
 
         # Add providers
+        providers = [
+            "provideRouter(routes)",
+            "provideAnimations()",
+            "provideHttpClient(withInterceptorsFromDi())",
+            "importProvidersFrom(TranslateModule.forRoot({ loader: { provide: TranslateLoader, useFactory: HttpLoaderFactory, deps: [HttpClient] } }))"
+        ]
+
+        if self.project_config.get("features", {}).get("authentication"):
+            providers.extend([
+                "OAuthService",
+                "{ provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true }"
+            ])
+
+        providers_str = ",\n    ".join(providers)
+
         providers_to_add = f\"\"\"
-    provideRouter(routes),
-    provideAnimations(),
-    provideHttpClient(withInterceptorsFromDi()),
-    OAuthService,
-    {{ provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true }},
-    importProvidersFrom(
-      TranslateModule.forRoot({{
-        loader: {{
-          provide: TranslateLoader,
-          useFactory: HttpLoaderFactory,
-          deps: [HttpClient]
-        }}
-      }}))
+    {providers_str}
 \"\"\"
         if "providers: [" in content:
             content = content.replace(
@@ -772,6 +820,33 @@ export class AuthInterceptor implements HttpInterceptor {
 """
         with open(os.path.join(interceptor_path, "auth.interceptor.ts"), "w") as f:
             f.write(interceptor_content)
+
+    def _generate_auth_guard(self, app_path):
+        """Generates an AuthGuard for protecting routes."""
+        core_path = os.path.join(app_path, "src", "app", "core")
+        guards_path = os.path.join(core_path, "guards")
+        os.makedirs(guards_path, exist_ok=True)
+
+        guard_content = """
+import { inject } from '@angular/core';
+import { CanActivateFn, Router } from '@angular/router';
+import { AuthService } from '../auth/auth.service';
+
+export const authGuard: CanActivateFn = (route, state) => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+
+  if (authService.isLoggedIn) {
+    return true;
+  }
+
+  // Redirect to login page
+  authService.login();
+  return false;
+};
+"""
+        with open(os.path.join(guards_path, "auth.guard.ts"), "w") as f:
+            f.write(guard_content)
 
     def _create_proxy_config(self, app_path):
         """Creates a proxy configuration file for the Angular dev server."""
