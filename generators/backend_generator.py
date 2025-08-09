@@ -22,7 +22,7 @@ class BackendGenerator:
     def _create_basic_structure(self, path):
         """Downloads and unzips the base Spring Boot project."""
         self._log("Creating Spring Boot base structure...")
-        run_cmd("curl https://start.spring.io/starter.zip -d dependencies=web,data-jpa,postgresql,lombok -o app.zip", cwd=path)
+        run_cmd("curl 'https://start.spring.io/starter.zip?type=maven-project&dependencies=web,data-jpa,postgresql,lombok,actuator,prometheus' -o app.zip", cwd=path)
         run_cmd("unzip app.zip -d .", cwd=path)
         os.remove(os.path.join(path, "app.zip"))
 
