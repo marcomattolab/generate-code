@@ -8,11 +8,11 @@ The generator creates a multi-platform application with a rich set of features o
 
 ### 🌐 Frontend (Angular)
 
-- **Modern Angular Setup:** Standalone components, SCSS styling.
+- **Modern Angular Setup:** Standalone components, SCSS styling, and the new built-in control flow syntax (`@for`, `@if`).
+- **State Management with Signals:** Uses Angular's built-in Signals for a simple, modern, and reactive state management architecture.
 - **Component Library:** PrimeNG for a rich set of UI components.
 - **Styling:** Tailwind CSS for utility-first styling.
-- **State Management:** NGXS for robust and scalable state management.
-- **API Integration:** Generates services for all entities to communicate with the backend.
+- **API Integration:** Generates signal-based services for all entities to communicate with the backend.
 - **Development Proxy:** Configures a proxy to the backend to avoid CORS issues.
 - **Internationalization (i18n):** Uses `@ngx-translate` for multi-language support.
 - **Testing:**
