@@ -61,6 +61,10 @@ class FrontendGenerator:
         # 11. Generate environment files
         self._generate_environment_files(app_path)
 
+        # 12. Generate auth files
+        self._generate_auth_files(app_path)
+        self._generate_auth_interceptor(app_path)
+
     def _install_dependencies(self, path):
         deps = [
             "primeng", "primeicons", "primeflex",
@@ -68,7 +72,8 @@ class FrontendGenerator:
             "@angular/forms",
             "@ngx-translate/core",
             "@ngx-translate/http-loader",
-            "@ngxs/store"
+            "@ngxs/store",
+            "angular-oauth2-oidc"
         ]
         run_cmd(f"npm install {' '.join(deps)}", cwd=path)
 
@@ -570,6 +575,7 @@ export const routes: Routes = [
 import {{ RouterModule }} from '@angular/router';
 import {{ CommonModule }} from '@angular/common';
 import {{ TranslateService, TranslateModule }} from '@ngx-translate/core';
+import {{ AuthService }} from './core/auth/auth.service';
 
 @Component({{
   selector: 'app-root',
@@ -579,6 +585,7 @@ import {{ TranslateService, TranslateModule }} from '@ngx-translate/core';
   styleUrls: ['./app.component.scss']
 }})
 export class AppComponent {{
+  authService = inject(AuthService);
   entities = [
     {entity_list}
   ];
@@ -598,18 +605,29 @@ export class AppComponent {{
         html_code = f'''<div class="flex h-screen bg-gray-100 font-sans">
   <!-- Sidebar -->
   <div class="w-64 bg-gray-800 text-white p-5 flex flex-col shadow-lg">
-    <div class="text-2xl font-bold mb-10 text-center">
-      <a routerLink="/" class="text-white no-underline">App</a>
+    <div>
+      <div class="text-2xl font-bold mb-10 text-center">
+        <a routerLink="/" class="text-white no-underline">App</a>
+      </div>
+      <nav>
+        <ul class="space-y-2">
+          <li *ngFor="let entity of entities">
+            <a [routerLink]="entity.path" routerLinkActive="active-link" class="flex items-center p-2 text-base font-normal text-gray-200 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+              <span class="ml-3">{{{{ entity.name }}}}</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
     </div>
-    <nav>
-      <ul class="space-y-2">
-        <li *ngFor="let entity of entities">
-          <a [routerLink]="entity.path" routerLinkActive="active-link" class="flex items-center p-2 text-base font-normal text-gray-200 rounded-lg hover:bg-gray-700 transition-colors duration-200">
-            <span class="ml-3">{{{{ entity.name }}}}</span>
-          </a>
-        </li>
-      </ul>
-    </nav>
+    <div class="mt-auto">
+      <div *ngIf="authService.isLoggedIn" class="p-2 text-center">
+        <span>{{{{ authService.username }}}}</span>
+        <button (click)="authService.logout()" class="w-full mt-2 p-2 bg-red-600 rounded">Logout</button>
+      </div>
+      <div *ngIf="!authService.isLoggedIn" class="p-2 text-center">
+        <button (click)="authService.login()" class="w-full p-2 bg-green-600 rounded">Login</button>
+      </div>
+    </div>
   </div>
 
   <!-- Main Content -->
@@ -664,6 +682,9 @@ import {{ NgxsLoggerPluginModule }} from '@ngxs/logger-plugin';
 import {{ NgxsReduxDevtoolsPluginModule }} from '@ngxs/devtools-plugin';
 {state_imports_str}
 import {{ environment }} from '../environments/environment';
+import {{ OAuthService }} from 'angular-oauth2-oidc';
+import {{ AuthInterceptor }} from './core/interceptors/auth.interceptor';
+import {{ HTTP_INTERCEPTORS }} from '@angular/common/http';
 
 export function HttpLoaderFactory(httpClient: HttpClient) {{
   return new TranslateHttpLoader(httpClient);
@@ -678,6 +699,8 @@ export function HttpLoaderFactory(httpClient: HttpClient) {{
     provideRouter(routes),
     provideAnimations(),
     provideHttpClient(),
+    OAuthService,
+    {{ provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true }},
     importProvidersFrom(
       TranslateModule.forRoot({{
         loader: {{
@@ -802,6 +825,99 @@ export const environment = {
 """
         with open(os.path.join(env_path, "environment.prod.ts"), "w") as f:
             f.write(prod_env_content)
+
+    def _generate_auth_files(self, app_path):
+        """Generates authentication-related files."""
+        core_path = os.path.join(app_path, "src", "app", "core")
+        auth_path = os.path.join(core_path, "auth")
+        os.makedirs(auth_path, exist_ok=True)
+
+        # auth.config.ts
+        auth_config_content = """
+import { AuthConfig } from 'angular-oauth2-oidc';
+
+export const authConfig: AuthConfig = {
+  issuer: 'http://localhost:8081/realms/myrealm',
+  redirectUri: window.location.origin,
+  clientId: 'my-angular-app',
+  responseType: 'code',
+  scope: 'openid profile email',
+  showDebugInformation: true,
+};
+"""
+        with open(os.path.join(auth_path, "auth.config.ts"), "w") as f:
+            f.write(auth_config_content)
+
+        # auth.service.ts
+        auth_service_content = """
+import { Injectable, inject } from '@angular/core';
+import { AuthConfig } from 'angular-oauth2-oidc';
+import { OAuthService } from 'angular-oauth2-oidc';
+import { authConfig } from './auth.config';
+
+@Injectable({ providedIn: 'root' })
+export class AuthService {
+  private oauthService = inject(OAuthService);
+
+  constructor() {
+    this.oauthService.configure(authConfig);
+    this.oauthService.loadDiscoveryDocumentAndTryLogin();
+  }
+
+  login() {
+    this.oauthService.initCodeFlow();
+  }
+
+  logout() {
+    this.oauthService.logOut();
+  }
+
+  get isLoggedIn(): boolean {
+    return this.oauthService.hasValidAccessToken();
+  }
+
+  get username(): string {
+    const claims = this.oauthService.getIdentityClaims();
+    if (!claims) {
+      return '';
+    }
+    return claims['preferred_username'];
+  }
+}
+"""
+        with open(os.path.join(auth_path, "auth.service.ts"), "w") as f:
+            f.write(auth_service_content)
+
+    def _generate_auth_interceptor(self, app_path):
+        """Generates an HttpInterceptor for adding auth tokens."""
+        core_path = os.path.join(app_path, "src", "app", "core")
+        interceptor_path = os.path.join(core_path, "interceptors")
+        os.makedirs(interceptor_path, exist_ok=True)
+
+        interceptor_content = """
+import { Injectable, inject } from '@angular/core';
+import { HttpEvent, HttpHandler, HttpInterceptor, HttpRequest } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { OAuthService } from 'angular-oauth2-oidc';
+
+@Injectable()
+export class AuthInterceptor implements HttpInterceptor {
+  private oauthService = inject(OAuthService);
+
+  intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    const token = this.oauthService.getAccessToken();
+    if (token) {
+      const cloned = req.clone({
+        headers: req.headers.set('Authorization', 'Bearer ' + token)
+      });
+      return next.handle(cloned);
+    }
+    return next.handle(req);
+  }
+}
+"""
+        with open(os.path.join(interceptor_path, "auth.interceptor.ts"), "w") as f:
+            f.write(interceptor_content)
 
     def _create_proxy_config(self, app_path):
         """Creates a proxy configuration file for the Angular dev server."""
