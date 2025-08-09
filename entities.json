@@ -32,6 +32,14 @@
         { "name": "firstName", "type": "string" },
         { "name": "lastName", "type": "string" },
         { "name": "email", "type": "string" }
+      ],
+      "relationships": [
+        {
+          "type": "oneToMany",
+          "entity": "Order",
+          "name": "orders",
+          "mappedBy": "customer"
+        }
       ]
     },
     {
@@ -39,8 +47,14 @@
       "columns": [
         { "name": "id", "type": "number" },
         { "name": "orderDate", "type": "string" },
-        { "name": "totalAmount", "type": "number" },
-        { "name": "customerId", "type": "number" }
+        { "name": "totalAmount", "type": "number" }
+      ],
+      "relationships": [
+        {
+          "type": "manyToOne",
+          "entity": "Customer",
+          "name": "customer"
+        }
       ]
     }
   ]
