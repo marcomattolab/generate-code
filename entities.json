@@ -24,6 +24,24 @@
         { "name": "name", "type": "string" },
         { "name": "description", "type": "string" }
       ]
+    },
+    {
+      "name": "Customer",
+      "columns": [
+        { "name": "id", "type": "number" },
+        { "name": "firstName", "type": "string" },
+        { "name": "lastName", "type": "string" },
+        { "name": "email", "type": "string" }
+      ]
+    },
+    {
+      "name": "Order",
+      "columns": [
+        { "name": "id", "type": "number" },
+        { "name": "orderDate", "type": "string" },
+        { "name": "totalAmount", "type": "number" },
+        { "name": "customerId", "type": "number" }
+      ]
     }
   ]
 }

@@ -38,6 +38,51 @@ datasources:
         with open(datasource_path, "w") as f:
             f.write(datasource_content)
 
+    def _generate_keycloak_realm_config(self):
+        """Generates a Keycloak realm configuration file."""
+        keycloak_path = os.path.join(self.root_dir, "keycloak")
+        os.makedirs(keycloak_path, exist_ok=True)
+
+        realm_config_path = os.path.join(keycloak_path, "realm-export.json")
+
+        realm_config = {
+          "realm": "myrealm",
+          "enabled": True,
+          "clients": [
+            {
+              "clientId": "my-angular-app",
+              "enabled": True,
+              "publicClient": True,
+              "redirectUris": ["http://localhost/*"],
+              "webOrigins": ["*"]
+            }
+          ],
+          "users": [
+            {
+              "username": "testuser",
+              "enabled": True,
+              "credentials": [
+                {
+                  "type": "password",
+                  "value": "test"
+                }
+              ],
+              "realmRoles": ["user"]
+            }
+          ],
+          "roles": {
+            "realm": [
+              {
+                "name": "user",
+                "description": "User role"
+              }
+            ]
+          }
+        }
+
+        with open(realm_config_path, "w") as f:
+            json.dump(realm_config, f, indent=2)
+
     def _generate_prometheus_config(self):
         """Generates a prometheus.yml file."""
         prometheus_path = os.path.join(self.root_dir, "prometheus")
@@ -92,6 +137,18 @@ services:
       - "9001:9001"
     command: server /data --console-address ":9001"
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:22.0.1
+    container_name: my_keycloak
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    command: ["start-dev", "--import-realm"]
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import
+    ports:
+      - "8081:8080"
+
   prometheus:
     image: prom/prometheus:v2.47.0
     container_name: my_prometheus
@@ -122,6 +179,7 @@ services:
     depends_on:
       - database
       - minio
+      - keycloak
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://database:5432/mydatabase
       SPRING_DATASOURCE_USERNAME: myuser
@@ -129,6 +187,7 @@ services:
       MINIO_URL: http://minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/myrealm
     ports:
       - "8080:8080"
 

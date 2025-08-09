@@ -22,7 +22,7 @@ class BackendGenerator:
     def _create_basic_structure(self, path):
         """Downloads and unzips the base Spring Boot project."""
         self._log("Creating Spring Boot base structure...")
-        run_cmd("curl 'https://start.spring.io/starter.zip?type=maven-project&dependencies=web,data-jpa,postgresql,lombok,actuator,prometheus' -o app.zip", cwd=path)
+        run_cmd("curl 'https://start.spring.io/starter.zip?type=maven-project&dependencies=web,data-jpa,postgresql,lombok,actuator,prometheus,oauth2-resource-server' -o app.zip", cwd=path)
         run_cmd("unzip app.zip -d .", cwd=path)
         os.remove(os.path.join(path, "app.zip"))
 
@@ -36,6 +36,10 @@ spring.datasource.password=mypassword
 spring.jpa.hibernate.ddl-auto=update
 spring.jpa.show-sql=true
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+management.endpoints.web.exposure.include=prometheus
+
+# Keycloak
+spring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost:8081/realms/myrealm
 """
 
         with open(properties_path, "w") as f:
@@ -66,6 +70,8 @@ spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 
             # Creazione Controller
             self._generate_controller(entity, src_path, entity_name, entity_name_lower)
+
+        self._generate_security_config(src_path)
 
     def _generate_entity(self, entity, src_path, entity_name, entity_name_lower):
         """Generates a JPA Entity class for the given entity."""
@@ -262,12 +268,14 @@ import {package_name}.dto.{dto_name};
 import {package_name}.service.{entity_name}Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/{entity_name_lower}s")
+@PreAuthorize("hasRole('user')")
 public class {entity_name}Controller {{
     @Autowired
     private {entity_name}Service service;
@@ -302,6 +310,41 @@ public class {entity_name}Controller {{
     }}
 }}
 ''')
+
+    def _generate_security_config(self, src_path):
+        """Generates a SecurityConfig class."""
+        config_path = os.path.join(src_path, "config")
+        os.makedirs(config_path, exist_ok=True)
+
+        security_config_content = f\"\"\"
+package {self.project_config["backend_package"]}.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.web.SecurityFilterChain;
+
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity
+public class SecurityConfig {{
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {{
+        http
+            .authorizeHttpRequests(authorize -> authorize
+                .anyRequest().authenticated()
+            )
+            .oauth2ResourceServer(oauth2 -> oauth2.jwt());
+        return http.build();
+    }}
+}}
+\"\"\"
+
+        with open(os.path.join(config_path, "SecurityConfig.java"), "w") as f:
+            f.write(security_config_content)
 
     def _map_type(self, column_type):
         if column_type == 'string':
