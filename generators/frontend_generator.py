@@ -34,7 +34,9 @@ class FrontendGenerator:
         self._generate_components(app_path)
 
         # 4. Update app config and styles
-        self._update_app_config(app_path)
+        with open(self.entities_file, "r") as f:
+            entities = json.load(f)["entities"]
+        self._update_app_config(app_path, entities)
         self._update_styles(app_path)
 
         # 5. Set up Storybook (temporarily disabled due to timeout)
@@ -56,7 +58,8 @@ class FrontendGenerator:
             "@angular/animations",
             "@angular/forms",
             "@ngx-translate/core",
-            "@ngx-translate/http-loader"
+            "@ngx-translate/http-loader",
+            "@ngxs/store"
         ]
         run_cmd(f"npm install {' '.join(deps)}", cwd=path)
 
@@ -64,7 +67,9 @@ class FrontendGenerator:
             "@storybook/angular", "@storybook/cli",
             "@angular-eslint/schematics",
             "prettier",
-            "cypress"
+            "cypress",
+            "@ngxs/logger-plugin",
+            "@ngxs/devtools-plugin"
         ]
         run_cmd(f"npm install --save-dev {' '.join(dev_deps)}", cwd=path)
 
@@ -98,6 +103,13 @@ class FrontendGenerator:
             self._generate_frontend_dto(entity, path, entity['name'])
             self._generate_service(entity, path, entity['name'])
 
+            # NGXS State
+            state_path = os.path.join(path, "src", "app", "core", "state", entity['name'].lower())
+            os.makedirs(state_path, exist_ok=True)
+            self._generate_ngxs_actions(entity, state_path, entity['name'])
+            self._generate_ngxs_state_model(entity, state_path, entity['name'])
+            self._generate_ngxs_state(entity, state_path, entity['name'])
+
             # E2E spec
             self._generate_e2e_spec(entity, path, entity['name'])
 
@@ -108,6 +120,8 @@ class FrontendGenerator:
 
     def _generate_component_code(self, entity):
         class_name = entity["name"].capitalize()
+        entity_name_lower = entity["name"].lower()
+        state_name = f"{class_name}State"
 
         form_controls = []
         for col in entity["columns"]:
@@ -129,28 +143,37 @@ class FrontendGenerator:
         primeng_imports_str = "\n".join(import_statements)
         primeng_modules_str = ", ".join(primeng_imports.keys())
 
-        service_name = f"{class_name}Service"
-        service_import = f"import {{ {service_name} }} from '../../core/services/{entity['name'].lower()}.service';"
-
-        return f"""import {{ Component, inject }} from '@angular/core';
+        return f\"\"\"
+import {{ Component, inject, OnInit }} from '@angular/core';
 import {{ FormBuilder, ReactiveFormsModule, Validators }} from '@angular/forms';
 import {{ CommonModule }} from '@angular/common';
+import {{ Store, Select }} from '@ngxs/store';
+import {{ Observable }} from 'rxjs';
+import {{ {state_name} }} from '../../core/state/{entity_name_lower}/{entity_name_lower}.state';
+import {{ Get{class_name}s, Add{class_name} }} from '../../core/state/{entity_name_lower}/{entity_name_lower}.actions';
+import {{ {class_name}Dto }} from '../../core/models/{entity_name_lower}.dto';
 {primeng_imports_str}
-{service_import}
 
 @Component({{
-  selector: 'app-{entity["name"].lower()}',
+  selector: 'app-{entity_name_lower}',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, {primeng_modules_str}],
-  templateUrl: './{entity["name"].lower()}.component.html'
+  templateUrl: './{entity_name_lower}.component.html'
 }})
-export class {class_name}Component {{
+export class {class_name}Component implements OnInit {{
+  @Select({state_name}.getItems) items$!: Observable<{class_name}Dto[]>;
+  @Select({state_name}.isLoading) isLoading$!: Observable<boolean>;
+
   private fb = inject(FormBuilder);
-  private {entity['name'].lower()}Service = inject({service_name});
+  private store = inject(Store);
 
   form = this.fb.group({{
     {form_controls_str}
   }});
+
+  ngOnInit() {{
+    this.store.dispatch(new Get{class_name}s());
+  }}
 
   save(): void {{
     if (this.form.invalid) {{
@@ -158,14 +181,11 @@ export class {class_name}Component {{
       return;
     }}
 
-    this.{entity['name'].lower()}Service.create(this.form.value as any).subscribe(() => {{
-      console.log('Saved successfully!');
-      // Optionally, reset the form or navigate away
-      this.form.reset();
-    }});
+    this.store.dispatch(new Add{class_name}(this.form.value as any));
+    this.form.reset();
   }}
 }}
-"""
+\"\"\"
 
     def _generate_component_html(self, entity):
         inputs = []
@@ -369,6 +389,137 @@ export class {entity_name_cap}Service {{
         with open(service_path, "w") as f:
             f.write(service_content)
 
+    def _generate_ngxs_actions(self, entity, state_path, entity_name):
+        """Generates NGXS action classes."""
+        actions_path = os.path.join(state_path, f"{entity_name.lower()}.actions.ts")
+        entity_name_cap = entity_name.capitalize()
+        dto_name = f"{entity_name_cap}Dto"
+
+        actions_content = f"""
+import {{ {dto_name} }} from '../../models/{entity_name.lower()}.dto';
+
+export class Get{entity_name_cap}s {{
+  static readonly type = '[{entity_name_cap}] Get All';
+}}
+
+export class Add{entity_name_cap} {{
+  static readonly type = '[{entity_name_cap}] Add';
+  constructor(public payload: {dto_name}) {{}}
+}}
+
+export class Update{entity_name_cap} {{
+  static readonly type = '[{entity_name_cap}] Update';
+  constructor(public payload: {dto_name}) {{}}
+}}
+
+export class Delete{entity_name_cap} {{
+  static readonly type = '[{entity_name_cap}] Delete';
+  constructor(public id: number) {{}}
+}}
+"""
+        with open(actions_path, "w") as f:
+            f.write(actions_content)
+
+    def _generate_ngxs_state_model(self, entity, state_path, entity_name):
+        """Generates the NGXS state model interface."""
+        model_path = os.path.join(state_path, f"{entity_name.lower()}.state.model.ts")
+        entity_name_cap = entity_name.capitalize()
+        dto_name = f"{entity_name_cap}Dto"
+
+        model_content = f"""
+import {{ {dto_name} }} from '../../models/{entity_name.lower()}.dto';
+
+export interface {entity_name_cap}StateModel {{
+  items: {dto_name}[];
+  loading: boolean;
+}}
+"""
+        with open(model_path, "w") as f:
+            f.write(model_content)
+
+    def _generate_ngxs_state(self, entity, state_path, entity_name):
+        """Generates the NGXS state class."""
+        state_file_path = os.path.join(state_path, f"{entity_name.lower()}.state.ts")
+        entity_name_cap = entity_name.capitalize()
+        service_name = f"{entity_name_cap}Service"
+        state_model = f"{entity_name_cap}StateModel"
+
+        state_content = f\"\"\"
+import {{ State, Action, StateContext, Selector }} from '@ngxs/store';
+import {{ inject, Injectable }} from '@angular/core';
+import {{ tap }} from 'rxjs/operators';
+import {{ {state_model} }} from './{entity_name.lower()}.state.model';
+import {{ Get{entity_name_cap}s, Add{entity_name_cap}, Update{entity_name_cap}, Delete{entity_name_cap} }} from './{entity_name.lower()}.actions';
+import {{ {service_name} }} from '../../services/{entity_name.lower()}.service';
+
+@State<{state_model}>({{
+  name: '{entity_name.lower()}s',
+  defaults: {{
+    items: [],
+    loading: false
+  }}
+}})
+@Injectable()
+export class {entity_name_cap}State {{
+  private service = inject({service_name});
+
+  @Selector()
+  static getItems(state: {state_model}) {{
+    return state.items;
+  }}
+
+  @Selector()
+  static isLoading(state: {state_model}) {{
+    return state.loading;
+  }}
+
+  @Action(Get{entity_name_cap}s)
+  get({{{{ patchState }}}}: StateContext<{state_model}>) {{
+    patchState({{ loading: true }});
+    return this.service.getAll().pipe(
+      tap(items => patchState({{ items, loading: false }}))
+    );
+  }}
+
+  @Action(Add{entity_name_cap})
+  add({{{{ getState, patchState }}}}: StateContext<{state_model}>, {{{{ payload }}}}: Add{entity_name_cap}) {{
+    patchState({{ loading: true }});
+    return this.service.create(payload).pipe(
+      tap(item => {{
+        const state = getState();
+        patchState({{ items: [...state.items, item], loading: false }});
+      }})
+    );
+  }}
+
+  @Action(Update{entity_name_cap})
+  update({{{{ getState, patchState }}}}: StateContext<{state_model}>, {{{{ payload }}}}: Update{entity_name_cap}) {{
+    patchState({{ loading: true }});
+    return this.service.update(payload.id, payload).pipe(
+      tap(item => {{
+        const state = getState();
+        const newItems = state.items.map(i => i.id === item.id ? item : i);
+        patchState({{ items: newItems, loading: false }});
+      }})
+    );
+  }}
+
+  @Action(Delete{entity_name_cap})
+  delete({{{{ getState, patchState }}}}: StateContext<{state_model}>, {{{{ id }}}}: Delete{entity_name_cap}) {{
+    patchState({{ loading: true }});
+    return this.service.delete(id).pipe(
+      tap(() => {{
+        const state = getState();
+        const newItems = state.items.filter(i => i.id !== id);
+        patchState({{ items: newItems, loading: false }});
+      }})
+    );
+  }}
+}}
+\"\"\"
+        with open(state_file_path, "w") as f:
+            f.write(state_content)
+
     def _generate_entities_routes(self, entities):
         if not entities:
             return "import { Routes } from '@angular/router';\n\nexport const routes: Routes = [];"
@@ -476,36 +627,64 @@ export class AppComponent {{
         with open(app_config_path, "r") as f:
             content = f.read()
 
-        # Add imports for i18n and other providers
-        imports_to_add = """import { provideRouter } from '@angular/router';
-import { routes } from './app.routes';
-import { provideAnimations } from '@angular/platform-browser/animations';
-import { provideHttpClient, HttpClient } from '@angular/common/http';
-import { importProvidersFrom } from '@angular/core';
-import { TranslateModule, TranslateLoader } from '@ngx-translate/core';
-import { TranslateHttpLoader } from '@ngx-translate/http-loader';
+        # Generate NGXS state imports
+        state_imports = []
+        state_classes = []
+        for entity in entities:
+            entity_name_cap = entity['name'].capitalize()
+            state_class = f"{entity_name_cap}State"
+            state_imports.append(f"import {{ {state_class} }} from './core/state/{entity['name'].lower()}/{entity['name'].lower()}.state';")
+            state_classes.append(state_class)
 
-export function HttpLoaderFactory(httpClient: HttpClient) {
+        state_imports_str = "\n".join(state_imports)
+        state_classes_str = ", ".join(state_classes)
+
+        # Add imports for i18n, NGXS, and other providers
+        imports_to_add = f\"\"\"import {{ provideRouter }} from '@angular/router';
+import {{ routes }} from './app.routes';
+import {{ provideAnimations }} from '@angular/platform-browser/animations';
+import {{ provideHttpClient, HttpClient }} from '@angular/common/http';
+import {{ importProvidersFrom }} from '@angular/core';
+import {{ TranslateModule, TranslateLoader }} from '@ngx-translate/core';
+import {{ TranslateHttpLoader }} from '@ngx-translate/http-loader';
+import {{ NgxsModule }} from '@ngxs/store';
+import {{ NgxsLoggerPluginModule }} from '@ngxs/logger-plugin';
+import {{ NgxsReduxDevtoolsPluginModule }} from '@ngxs/devtools-plugin';
+{state_imports_str}
+import {{ environment }} from '../environments/environment';
+
+export function HttpLoaderFactory(httpClient: HttpClient) {{
   return new TranslateHttpLoader(httpClient);
-}
-"""
+}}
+\"\"\"
 
         # Prepend the imports to be safe
         content = imports_to_add + content
 
         # Add providers
-        providers_to_add = """
+        providers_to_add = f\"\"\"
     provideRouter(routes),
     provideAnimations(),
     provideHttpClient(),
-    importProvidersFrom(TranslateModule.forRoot({{
-      loader: {{
-        provide: TranslateLoader,
-        useFactory: HttpLoaderFactory,
-        deps: [HttpClient]
-      }}
-    }}))
-"""
+    importProvidersFrom(
+      TranslateModule.forRoot({{
+        loader: {{
+          provide: TranslateLoader,
+          useFactory: HttpLoaderFactory,
+          deps: [HttpClient]
+        }}
+      }}),
+      NgxsModule.forRoot([{state_classes_str}], {{
+        developmentMode: !environment.production
+      }}),
+      NgxsLoggerPluginModule.forRoot({{
+        disabled: environment.production
+      }}),
+      NgxsReduxDevtoolsPluginModule.forRoot({{
+        disabled: environment.production
+      }})
+    )
+\"\"\"
         if "providers: [" in content:
             content = content.replace(
                 "providers: [",
