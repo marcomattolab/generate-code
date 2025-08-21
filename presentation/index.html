@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered GitHub Project Generator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main>
+        <section class="slide active">
+            <h1>AI-Powered GitHub Project Generator</h1>
+            <p>Rapidly scaffold full-stack applications from a simple configuration.</p>
+        </section>
+
+        <section class="slide">
+            <h2>Overview</h2>
+            <ul>
+                <li><strong>What is it?</strong> A powerful tool that automates the creation of modern web applications.</li>
+                <li><strong>Core Idea:</strong> Define your data models once in a simple JSON file, and the generator builds the entire application stack.</li>
+                <li><strong>Key Features:</strong>
+                    <ul>
+                        <li>Full-stack generation (Frontend + Backend)</li>
+                        <li>Support for multiple frontend frameworks (Angular, React)</li>
+                        <li>CI/CD and Docker support out-of-the-box</li>
+                        <li>AI-powered configuration</li>
+                    </ul>
+                </li>
+            </ul>
+        </section>
+
+        <section class="slide">
+            <h2>The Backend Generator (Spring Boot)</h2>
+            <ul>
+                <li><strong>Technology:</strong> Java with Spring Boot & Maven</li>
+                <li><strong>Database:</strong> PostgreSQL integration</li>
+                <li><strong>Architecture:</strong>
+                    <ul>
+                        <li>RESTful API for each entity</li>
+                        <li>Clear separation of concerns (Controller, Service, Repository)</li>
+                        <li>JPA for data persistence</li>
+                        <li>DTO pattern for clean API design</li>
+                    </ul>
+                </li>
+            </ul>
+        </section>
+
+        <section class="slide">
+            <h2>The Frontend Generator (Angular & React)</h2>
+            <ul>
+                <li><strong>Flexibility:</strong> Choose your preferred framework in the project configuration.</li>
+                <li><strong>Angular:</strong> Modern, standalone components, PrimeNG for UI, Signal-based state management.</li>
+                <li><strong>React:</strong> Standard `create-react-app` base, `axios` for API communication, `react-router-dom` for navigation.</li>
+            </ul>
+        </section>
+
+        <section class="slide">
+            <h2>CI/CD & DevOps</h2>
+            <ul>
+                <li><strong>Containerization:</strong> Dockerfiles for both frontend and backend.</li>
+                <li><strong>Orchestration:</strong> `docker-compose.yml` to run the entire stack.</li>
+                <li><strong>Includes:</strong> PostgreSQL, Nginx, Keycloak (optional), Prometheus & Grafana (optional).</li>
+            </ul>
+        </section>
+
+        <section class="slide">
+            <h2>The AI-Powered Future</h2>
+             <ul>
+                <li><strong>Current Feature:</strong> Natural Language to `entities.json`.</li>
+                <li><strong>Example:</strong> "create a user with a name and an email"</li>
+                <li><strong>Future Possibilities:</strong> AI-generated UI, automated test creation, AI-driven code refactoring.</li>
+            </ul>
+        </section>
+
+        <section class="slide">
+            <h2>How it Works</h2>
+            <ol>
+                <li>Write a simple sentence to describe your entities.</li>
+                <li>Run the AI script: `python3 ai_entities.py "..."`</li>
+                <li>Run the main generator: `python3 main.py`</li>
+                <li>Run docker-compose: `docker-compose up`</li>
+                <li>Your full application is running!</li>
+            </ol>
+        </section>
+
+        <section class="slide">
+            <h2>Questions?</h2>
+        </section>
+    </main>
+
+    <div class="navigation">
+        <button id="prevBtn">Prev</button>
+        <button id="nextBtn">Next</button>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

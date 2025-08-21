@@ -7,38 +7,115 @@ class BackendGenerator:
         self.root_dir = root_dir
         self.entities_file = entities_file
         self.project_config = project_config
+        self.backend_path = os.path.join(self.root_dir, self.project_config["backend"])
+        self.src_path = os.path.join(self.backend_path, "src", "main", "java", *self.project_config["backend_package"].split("."))
 
     def generate(self):
-        backend_path = os.path.join(self.root_dir, self.project_config["backend"])
-        os.makedirs(backend_path, exist_ok=True)
+        os.makedirs(self.backend_path, exist_ok=True)
 
         # Step 1: Create Spring Boot base structure and configuration
-        self._create_basic_structure(backend_path)
-        self._generate_application_properties(backend_path)
+        self._create_manual_structure()
+        self._generate_application_properties()
+        self._create_main_application_file()
 
         # Step 2: Generate entities, repositories, services, and controllers
-        self._generate_entities_and_services(backend_path)
+        self._generate_entities_and_services()
 
-    def _create_basic_structure(self, path):
-        """Downloads and unzips the base Spring Boot project."""
-        self._log("Creating Spring Boot base structure...")
+    def _create_manual_structure(self):
+        """Creates the base Spring Boot project structure manually."""
+        print("Creating Spring Boot base structure manually...")
 
-        dependencies = ["web", "data-jpa", "postgresql", "lombok"]
+        # Create standard Maven directories
+        os.makedirs(os.path.join(self.backend_path, "src", "main", "resources"), exist_ok=True)
+        os.makedirs(os.path.join(self.backend_path, "src", "test", "java"), exist_ok=True)
+        os.makedirs(self.src_path, exist_ok=True)
+
+        # Create pom.xml
+        pom_content = self._get_pom_xml_content()
+        with open(os.path.join(self.backend_path, "pom.xml"), "w") as f:
+            f.write(pom_content)
+
+    def _get_pom_xml_content(self):
+        group_id = self.project_config["backend_package"]
+        artifact_id = self.project_config["backend"]
+        name = self.project_config["name"]
+        description = self.project_config.get("description", "Demo project for Spring Boot")
+
+        dependencies = [
+            "<dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>",
+            "<dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-data-jpa</artifactId></dependency>",
+            "<dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId><scope>runtime</scope></dependency>",
+            "<dependency><groupId>org.projectlombok</groupId><artifactId>lombok</artifactId><optional>true</optional></dependency>",
+            "<dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>"
+        ]
+
         if self.project_config.get("features", {}).get("authentication"):
-            dependencies.append("oauth2-resource-server")
+            dependencies.append("<dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-oauth2-resource-server</artifactId></dependency>")
         if self.project_config.get("features", {}).get("monitoring"):
-            dependencies.append("actuator")
-            dependencies.append("prometheus")
+            dependencies.append("<dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-actuator</artifactId></dependency>")
+            dependencies.append("<dependency><groupId>io.micrometer</groupId><artifactId>micrometer-registry-prometheus</artifactId></dependency>")
 
-        deps_str = ",".join(dependencies)
+        dependencies_str = "\n        ".join(dependencies)
 
-        run_cmd(f"curl 'https://start.spring.io/starter.zip?type=maven-project&dependencies={deps_str}' -o app.zip", cwd=path)
-        run_cmd("unzip app.zip -d .", cwd=path)
-        os.remove(os.path.join(path, "app.zip"))
+        return f'''<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.1.5</version>
+        <relativePath/>
+    </parent>
+    <groupId>{group_id}</groupId>
+    <artifactId>{artifact_id}</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>{name}</name>
+    <description>{description}</description>
+    <properties>
+        <java.version>17</java.version>
+    </properties>
+    <dependencies>
+        {dependencies_str}
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+'''
 
-    def _generate_application_properties(self, path):
+    def _create_main_application_file(self):
+        """Creates the main Spring Boot application class."""
+        package_name = self.project_config["backend_package"]
+        app_name = "".join(word.capitalize() for word in self.project_config["name"].split("-")) + "Application"
+
+        main_app_content = f"""
+package {package_name};
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class {app_name} {{
+
+    public static void main(String[] args) {{
+        SpringApplication.run({app_name}.class, args);
+    }}
+
+}}
+"""
+        with open(os.path.join(self.src_path, f"{app_name}.java"), "w") as f:
+            f.write(main_app_content)
+
+
+    def _generate_application_properties(self):
         """Generates the application.properties file for PostgreSQL configuration."""
-        properties_path = os.path.join(path, "src", "main", "resources", "application.properties")
+        properties_path = os.path.join(self.backend_path, "src", "main", "resources", "application.properties")
 
         properties_content = """spring.datasource.url=jdbc:postgresql://localhost:5432/mydatabase
 spring.datasource.username=myuser
@@ -58,34 +135,27 @@ spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
         with open(properties_path, "w") as f:
             f.write(properties_content)
 
-    def _generate_entities_and_services(self, path):
+    def _generate_entities_and_services(self):
         """Genera entità JPA, repository, controller, e service da entities.json"""
         with open(self.entities_file, "r") as f:
             entities = json.load(f)["entities"]
-
-        src_path = os.path.join(path, "src", "main", "java", *self.project_config["backend_package"].split("."))
-        os.makedirs(src_path, exist_ok=True)
 
         for entity in entities:
             entity_name = entity["name"]
             entity_name_lower = entity_name.lower()
 
-            # Generate Entity, DTO, and Mapper
-            self._generate_entity(entity, src_path, entity_name, entity_name_lower)
-            self._generate_dto(entity, src_path, entity_name)
-            self._generate_mapper(entity, src_path, entity_name)
+            self._generate_entity(entity, self.src_path, entity_name, entity_name_lower)
+            self._generate_dto(entity, self.src_path, entity_name)
+            self._generate_mapper(entity, self.src_path, entity_name)
+            self._generate_repository(entity, self.src_path, entity_name, entity_name_lower)
+            self._generate_service(entity, self.src_path, entity_name, entity_name_lower)
+            self._generate_controller(entity, self.src_path, entity_name, entity_name_lower)
 
-            # Generate Repository
-            self._generate_repository(entity, src_path, entity_name, entity_name_lower)
-
-            # Creazione Service
-            self._generate_service(entity, src_path, entity_name, entity_name_lower)
-
-            # Creazione Controller
-            self._generate_controller(entity, src_path, entity_name, entity_name_lower)
+        self._generate_dashboard_service(self.src_path, entities)
+        self._generate_dashboard_controller(self.src_path)
 
         if self.project_config.get("features", {}).get("authentication"):
-            self._generate_security_config(src_path)
+            self._generate_security_config(self.src_path)
 
     def _generate_entity(self, entity, src_path, entity_name, entity_name_lower):
         """Generates a JPA Entity class for the given entity."""
@@ -104,18 +174,18 @@ spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
                 if rel["type"] == "manyToOne":
                     rel_entity = rel["entity"]
                     rel_name = rel["name"]
-                    entity_fields.append(f"\n    @ManyToOne\n    @JoinColumn(name = \"{rel_name}_id\")\n    private {rel_entity} {rel_name};")
+                    entity_fields.append(f'\n    @ManyToOne\n    @JoinColumn(name = "{rel_name}_id")\n    private {rel_entity} {rel_name};')
                 elif rel["type"] == "oneToMany":
                     rel_entity = rel["entity"]
                     rel_name = rel["name"]
                     mapped_by = rel["mappedBy"]
-                    entity_fields.append(f"\n    @OneToMany(mappedBy = \"{mapped_by}\")\n    private java.util.List<{rel_entity}> {rel_name};")
+                    entity_fields.append(f'\n    @OneToMany(mappedBy = "{mapped_by}")\n    private java.util.List<{rel_entity}> {rel_name};')
 
 
         entity_fields_str = "\n".join(entity_fields)
 
         with open(os.path.join(entity_path, f"{entity_name}.java"), "w") as f:
-            f.write(f"""
+            f.write(f'''
 package {self.project_config["backend_package"]}.model;
 
 import jakarta.persistence.*;
@@ -135,7 +205,7 @@ public class {entity_name} {{
 
 {entity_fields_str}
 }}
-""")
+''')
 
     def _generate_dto(self, entity, src_path, entity_name):
         """Generates a DTO class for the given entity."""
@@ -216,7 +286,7 @@ public class {entity_name}Mapper {{
         os.makedirs(repo_path, exist_ok=True)
 
         with open(os.path.join(repo_path, f"{entity_name}Repository.java"), "w") as f:
-            f.write(f"""
+            f.write(f'''
 package {self.project_config["backend_package"]}.repository;
 
 import {self.project_config["backend_package"]}.model.{entity_name};
@@ -226,7 +296,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface {entity_name}Repository extends JpaRepository<{entity_name}, Long> {{
 }}
-""")
+''')
 
     def _generate_service(self, entity, src_path, entity_name, entity_name_lower):
         """Generates a service class for the entity."""
@@ -290,22 +360,22 @@ public class {entity_name}Service {{
         authentication_enabled = self.project_config.get("features", {}).get("authentication")
 
         imports = [
-            f"import {package_name}.dto.{dto_name};",
-            f"import {package_name}.service.{entity_name}Service;",
-            "import org.springframework.beans.factory.annotation.Autowired;",
-            "import org.springframework.http.ResponseEntity;",
-            "import org.springframework.web.bind.annotation.*;",
-            "import java.util.List;"
+            f'import {package_name}.dto.{dto_name};',
+            f'import {package_name}.service.{entity_name}Service;',
+            'import org.springframework.beans.factory.annotation.Autowired;',
+            'import org.springframework.http.ResponseEntity;',
+            'import org.springframework.web.bind.annotation.*;',
+            'import java.util.List;'
         ]
 
         annotations = [
-            "@RestController",
+            '@RestController',
             f'@RequestMapping("/api/{entity_name_lower}s")'
         ]
 
         if authentication_enabled:
-            imports.append("import org.springframework.security.access.prepost.PreAuthorize;")
-            annotations.append("@PreAuthorize(\"hasRole('user')\")")
+            imports.append('import org.springframework.security.access.prepost.PreAuthorize;')
+            annotations.append('@PreAuthorize("hasRole(\'user\')")')
 
         imports_str = "\n".join(imports)
         annotations_str = "\n".join(annotations)
@@ -357,7 +427,7 @@ public class {entity_name}Controller {{
         config_path = os.path.join(src_path, "config")
         os.makedirs(config_path, exist_ok=True)
 
-        security_config_content = f\"\"\"
+        security_config_content = f'''
 package {self.project_config["backend_package"]}.config;
 
 import org.springframework.context.annotation.Bean;
@@ -382,10 +452,80 @@ public class SecurityConfig {{
         return http.build();
     }}
 }}
-\"\"\"
+'''
 
         with open(os.path.join(config_path, "SecurityConfig.java"), "w") as f:
             f.write(security_config_content)
+
+    def _generate_dashboard_service(self, src_path, entities):
+        """Generates a DashboardService class."""
+        service_path = os.path.join(src_path, "service")
+        os.makedirs(service_path, exist_ok=True)
+
+        repo_imports = "\n".join([f"import {self.project_config['backend_package']}.repository.{entity['name']}Repository;" for entity in entities])
+        repo_injections = "\n    ".join([f"@Autowired\n    private {entity['name']}Repository {entity['name'].lower()}Repository;" for entity in entities])
+
+        counts = ",\n            ".join([f'"{entity["name"].lower()}s", {entity["name"].lower()}Repository.count()' for entity in entities])
+
+        service_content = f'''
+package {self.project_config["backend_package"]}.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import java.util.Map;
+import java.util.HashMap;
+{repo_imports}
+
+@Service
+public class DashboardService {{
+    {repo_injections}
+
+    public Map<String, Long> getEntityCounts() {{
+        Map<String, Long> counts = new HashMap<>();
+        counts.putAll(Map.of(
+            {counts}
+        ));
+        return counts;
+    }}
+}}
+'''
+
+        with open(os.path.join(service_path, "DashboardService.java"), "w") as f:
+            f.write(service_content)
+
+    def _generate_dashboard_controller(self, src_path):
+        """Generates a DashboardController class."""
+        controller_path = os.path.join(src_path, "controller")
+        os.makedirs(controller_path, exist_ok=True)
+
+        controller_content = f'''
+package {self.project_config["backend_package"]}.controller;
+
+import {self.project_config["backend_package"]}.service.DashboardService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/dashboard")
+@PreAuthorize("hasRole('admin')")
+public class DashboardController {{
+    @Autowired
+    private DashboardService service;
+
+    @GetMapping("/counts")
+    public Map<String, Long> getEntityCounts() {{
+        return service.getEntityCounts();
+    }}
+}}
+'''
+
+        with open(os.path.join(controller_path, "DashboardController.java"), "w") as f:
+            f.write(controller_content)
 
     def _map_type(self, column_type):
         if column_type == 'string':

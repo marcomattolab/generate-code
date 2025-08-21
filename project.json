@@ -4,7 +4,10 @@
     "author": "marco martorana",
     "name":"generated_app",
     "backend": "backend",
-    "frontend": "frontend",
+    "frontend": {
+      "name": "frontend",
+      "framework": "angular"
+    },
     "backend_package": "backend_package",
     "mobile_app": "my_flutter_app",
     "features": {

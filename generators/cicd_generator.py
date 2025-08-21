@@ -65,23 +65,29 @@ datasources:
           ],
           "users": [
             {
+              "username": "testadmin",
+              "enabled": True,
+              "credentials": [{"type": "password", "value": "admin"}],
+              "realmRoles": ["admin", "user"]
+            },
+            {
               "username": "testuser",
               "enabled": True,
-              "credentials": [
-                {
-                  "type": "password",
-                  "value": "test"
-                }
-              ],
+              "credentials": [{"type": "password", "value": "test"}],
               "realmRoles": ["user"]
+            },
+            {
+              "username": "testguest",
+              "enabled": True,
+              "credentials": [{"type": "password", "value": "guest"}],
+              "realmRoles": ["guest"]
             }
           ],
           "roles": {
             "realm": [
-              {
-                "name": "user",
-                "description": "User role"
-              }
+              {"name": "admin", "description": "Administrator role"},
+              {"name": "user", "description": "User role"},
+              {"name": "guest", "description": "Guest role"}
             ]
           }
         }

@@ -3,57 +3,17 @@
     {
       "name": "User",
       "columns": [
-        { "name": "id", "type": "number" },
-        { "name": "name", "type": "string" },
-        { "name": "username", "type": "string" },
-        { "name": "email", "type": "string" }
-      ]
-    },
-    {
-      "name": "Product",
-      "columns": [
-        { "name": "id", "type": "number" },
-        { "name": "title", "type": "string" },
-        { "name": "price", "type": "number" }
-      ]
-    },
-    {
-      "name": "Category",
-      "columns": [
-        { "name": "id", "type": "number" },
-        { "name": "name", "type": "string" },
-        { "name": "description", "type": "string" }
-      ]
-    },
-    {
-      "name": "Customer",
-      "columns": [
-        { "name": "id", "type": "number" },
-        { "name": "firstName", "type": "string" },
-        { "name": "lastName", "type": "string" },
-        { "name": "email", "type": "string" }
-      ],
-      "relationships": [
         {
-          "type": "oneToMany",
-          "entity": "Order",
-          "name": "orders",
-          "mappedBy": "customer"
-        }
-      ]
-    },
-    {
-      "name": "Order",
-      "columns": [
-        { "name": "id", "type": "number" },
-        { "name": "orderDate", "type": "string" },
-        { "name": "totalAmount", "type": "number" }
-      ],
-      "relationships": [
+          "name": "name",
+          "type": "string"
+        },
         {
-          "type": "manyToOne",
-          "entity": "Customer",
-          "name": "customer"
+          "name": "email",
+          "type": "string"
+        },
+        {
+          "name": "user_id",
+          "type": "number"
         }
       ]
     }
